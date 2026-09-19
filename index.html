@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>גיבנק — שאלות, רמזים, התקדמות</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap">
+<script>
+window.MathJax = { tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] }, svg: { fontCache: 'global' }, startup: { typeset: false } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --paper:#F4F4F1; --card:#FFFFFF; --navy:#141414; --navy-line:#141414;
+  --ink:#141414; --ink-2:#6E6E6B; --orange:#141414;
+  --panel:#E9E9E5; --panel-line:#141414;
+  --cream:#E4E4E0; --blue-chip:#EDEDE9; --blue-chip-ink:#141414;
+  --green-chip:#DCDCD7; --green-chip-ink:#141414;
+  --hard-chip:#CFCFCA; --hard-chip-ink:#141414;
+  --sheet:#161616; --sheet-ink:#F2F2F0; --sheet-2:#A6A6A2; --sheet-line:#4A4A48; --sheet-hover:#242424;
+  --sheet-mark:#C9C9C4; --rule-soft:#C9C9C4;
+  --shadow:rgba(20,20,20,.16);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#121212; --card:#1C1C1C; --navy:#000000; --navy-line:#4C4C4C;
+  --ink:#F2F2F0; --ink-2:#A3A3A0; --orange:#F2F2F0;
+  --panel:#242424; --panel-line:#4C4C4C;
+  --cream:#2E2E2E; --blue-chip:#2A2A2A; --blue-chip-ink:#F2F2F0;
+  --green-chip:#343434; --green-chip-ink:#F2F2F0;
+  --hard-chip:#3E3E3E; --hard-chip-ink:#F2F2F0;
+  --sheet:#000000; --sheet-ink:#F2F2F0; --sheet-2:#9C9C99; --sheet-line:#3A3A3A; --sheet-hover:#141414;
+  --sheet-mark:#8A8A86; --rule-soft:#3A3A3A;
+  --shadow:rgba(0,0,0,.5);
+}}
+:root[data-theme="dark"]{
+  --paper:#121212; --card:#1C1C1C; --navy:#000000; --navy-line:#4C4C4C;
+  --ink:#F2F2F0; --ink-2:#A3A3A0; --orange:#F2F2F0;
+  --panel:#242424; --panel-line:#4C4C4C;
+  --cream:#2E2E2E; --blue-chip:#2A2A2A; --blue-chip-ink:#F2F2F0;
+  --green-chip:#343434; --green-chip-ink:#F2F2F0;
+  --hard-chip:#3E3E3E; --hard-chip-ink:#F2F2F0;
+  --sheet:#000000; --sheet-ink:#F2F2F0; --sheet-2:#9C9C99; --sheet-line:#3A3A3A; --sheet-hover:#141414;
+  --sheet-mark:#8A8A86; --rule-soft:#3A3A3A;
+  --shadow:rgba(0,0,0,.5);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 Heebo,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--card);border:2px solid var(--ink);border-radius:9px;padding:8px 16px;font-weight:700;font-size:15px}
+button:hover:not(:disabled){background:var(--cream);border-color:var(--ink)}
+button:disabled{opacity:.5;cursor:default}
+button.solid{background:var(--navy);color:#fff;border-color:var(--navy)}
+button.solid:hover{background:var(--sheet-hover)}
+button.fire{background:var(--ink);border-color:var(--ink);color:var(--card);font-weight:800}
+button.fire:hover{background:var(--sheet-hover);border-color:var(--sheet-hover)}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+
+/* masthead */
+.mast{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:2px solid var(--navy-line)}
+.mastin{display:flex;align-items:center;gap:22px;max-width:1180px;margin:0 auto;padding:10px 22px}
+.brand{display:flex;flex-direction:column;line-height:1.05}
+.brand .name{font-weight:900;font-size:26px;letter-spacing:.01em}
+.brand .tag{font-size:12.5px;color:var(--ink-2);font-weight:500}
+.mast nav{display:flex;gap:28px;margin-inline-start:34px}
+.mast nav a{position:relative;color:var(--ink);text-decoration:none;font-weight:700;font-size:16px;padding:14px 0}
+.mast nav a:hover{text-decoration:underline}
+.mast nav a.sel::after{content:"";position:absolute;inset-inline:0;bottom:-2px;height:4px;background:var(--ink);border-radius:2px}
+.mast .auth{margin-inline-start:14px;display:flex;gap:12px}
+
+/* mini search in the masthead */
+.minisearch{position:relative;margin-inline-start:auto;width:0;opacity:0;overflow:hidden;
+  transition:width .22s ease,opacity .22s ease}
+.minisearch.show{width:230px;opacity:1}
+.minisearch input{width:100%;padding:6px 34px 6px 10px;border:2px solid var(--navy-line);border-radius:8px;
+  background:var(--card);font-size:14.5px;font-weight:500}
+.minisearch svg{position:absolute;inset-inline-start:11px;top:9px;width:15px;height:15px;fill:none;stroke:var(--orange);stroke-width:2.4}
+@media (prefers-reduced-motion:reduce){.minisearch{transition:none}}
+
+/* course cards on the opening screen */
+.courses{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;margin-top:20px}
+.course{background:var(--card);border:2px solid var(--navy-line);border-radius:13px;padding:16px 18px;
+  display:grid;gap:4px;box-shadow:0 2px 0 var(--shadow);text-align:start;font:inherit;color:inherit}
+.course:hover{border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
+.course .cno{font-size:13px;font-weight:700;color:var(--ink-2);letter-spacing:.06em}
+.course .ctitle{font-size:21px;font-weight:800}
+.course .cline{font-size:14.5px;color:var(--ink-2)}
+.course .cgo{margin-top:8px;font-size:14.5px;font-weight:700;color:var(--blue-chip-ink)}
+.courses .none{grid-column:1/-1;color:var(--ink-2);font-size:15px;line-height:1.7}
+
+/* course bar above the bank */
+.coursebar{border-bottom:1px solid var(--rule-soft);background:var(--panel)}
+.coursebar .wrap{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;padding-top:9px;padding-bottom:9px}
+.coursebar .cname{font-size:18px;font-weight:800}
+.coursebar .cmeta{font-size:14px;color:var(--ink-2)}
+.coursebar button{margin-inline-start:auto;padding:5px 12px;font-size:14px}
+
+/* opening search */
+.hero{border-bottom:1px solid var(--rule-soft);padding:30px 0 22px}
+.hero h1{margin:0;font-size:38px;font-weight:900;line-height:1.18;letter-spacing:-.01em}
+.hero .lede{margin:10px 0 18px;color:var(--ink-2);font-size:16.5px}
+.hero .searchrow{max-width:720px}
+
+/* controls */
+.controls{padding:16px 0 0}
+.searchrow{position:relative;margin-bottom:0}
+.qsearch{margin-bottom:14px}
+.searchrow input{width:100%;padding:14px 52px 14px 16px;border:2px solid var(--navy-line);border-radius:11px;background:var(--card);font-size:18px;font-weight:500}
+.searchrow input::placeholder{color:var(--ink-2);font-weight:400}
+.searchrow svg{position:absolute;inset-inline-start:17px;top:16px;width:20px;height:20px;fill:none;stroke:var(--orange);stroke-width:2.4}
+.panel{background:var(--panel);border:2px solid var(--panel-line);border-radius:13px;padding:14px 16px}
+.fields{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field span{font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.field select{appearance:none;width:100%;padding:9px 12px 9px 30px;border:2px solid var(--navy-line);border-radius:9px;
+  background:var(--card) no-repeat;font-weight:700;font-size:15px;text-align:center}
+.field select:hover{border-color:var(--ink)}
+.field.active select{border-color:var(--ink);border-width:3px;padding:8px 11px 8px 29px}
+.field .arrow{position:relative}
+.field .arrow::after{content:"";position:absolute;inset-inline-end:auto;inset-inline-start:12px;top:calc(50% - 3px);
+  width:8px;height:8px;border-inline-start:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(-45deg);pointer-events:none}
+.panel hr{border:0;border-top:1px solid var(--panel-line);opacity:.25;margin:14px 0}
+.panel .row{display:flex;align-items:center;gap:14px}
+.panel .row label{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px}
+.panel .row label input{width:19px;height:19px;accent-color:var(--orange)}
+.panel .row .grow{margin-inline-start:auto}
+.panel .row button{display:flex;align-items:center;gap:9px}
+.panel .row button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2}
+
+/* results header */
+.results{display:flex;align-items:baseline;gap:12px;padding:22px 0 10px}
+.results .n{font-size:26px;font-weight:900}
+.results .of{color:var(--ink-2);font-size:15px}
+.results .only{margin-inline-start:auto;color:var(--ink-2);font-size:14.5px;display:flex;align-items:center;gap:8px}
+.results .only::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--ink)}
+.rule{border:0;border-top:2px solid var(--navy-line);margin:0 0 20px}
+
+/* question cards */
+#list{display:grid;gap:18px}
+.q{background:var(--card);border:2px solid var(--rule-soft);border-radius:13px;padding:18px 22px 18px 22px;
+  display:grid;grid-template-columns:76px 1fr;gap:18px;box-shadow:0 2px 0 var(--shadow)}
+.q.solved{border-color:var(--ink);border-inline-start-width:7px}
+.q .num{font-weight:900;font-size:34px;color:var(--ink);line-height:1}
+.q .num i{display:block;width:44px;height:4px;background:var(--ink);border-radius:2px;margin-top:10px}
+.q .tags{display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-start;margin-bottom:10px}
+.chip{font-size:13px;font-weight:700;padding:4px 13px;border-radius:999px;border:1.5px solid var(--navy-line);background:var(--cream)}
+.chip.level{border-color:transparent;background:var(--green-chip);color:var(--green-chip-ink)}
+.chip.level.mid{background:var(--cream);color:var(--ink)}
+.chip.level.hard{background:var(--hard-chip);color:var(--hard-chip-ink)}
+.q h2{margin:0;font-size:22px;font-weight:800;line-height:1.35}
+.q .sum{margin:8px 0 0;color:var(--ink-2);font-size:16px}
+.q .sum b{color:var(--ink)}
+.q .stmt{margin:8px 0 0;font-size:17px;line-height:1.85;white-space:pre-line}
+.q .ctx{margin:8px 0 0;color:var(--ink-2);font-size:15.5px;white-space:pre-line;border-inline-start:3px solid var(--rule-soft);padding-inline-start:11px}
+.q .choices{margin:8px 0 0;padding-inline-start:22px;font-size:16px}
+.q .choices li{margin-bottom:3px}
+.chip.warn{background:transparent;border-style:dashed;border-color:var(--ink);color:var(--ink);font-weight:700}
+.pdfnote{margin:11px 0 0;font-size:13.5px;color:var(--ink-2)}
+.q .bottom{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px}
+.q .topics{display:flex;flex-wrap:wrap;gap:8px}
+.chip.topic{background:var(--blue-chip);border-color:transparent;color:var(--blue-chip-ink)}
+.q .acts{margin-inline-start:auto;display:flex;flex-wrap:wrap;gap:10px}
+.q .stat{font-size:13.5px;color:var(--ink-2)}
+button.on{background:var(--green-chip);border-color:var(--ink);color:var(--ink);font-weight:800}
+button.liked{background:var(--cream);border-color:var(--ink);font-weight:800}
+
+/* hints — dark sheet inside the card */
+.hints{grid-column:1/-1;background:var(--sheet);color:var(--sheet-ink);border-radius:11px;padding:16px 18px;margin-top:4px}
+.hint{border-inline-start:4px solid var(--sheet-mark);padding:2px 13px;margin-bottom:13px}
+.hint .htxt{font-size:16px}
+.hint .meta{display:flex;align-items:center;gap:10px;margin-top:7px;font-size:13px;color:var(--sheet-2)}
+.hint .meta button{background:transparent;color:var(--sheet-ink);border-color:var(--sheet-line);padding:2px 10px;font-size:13px;border-width:1.5px}
+.hint .meta button:hover{background:var(--sheet-hover)}
+.hints .note{color:var(--sheet-2);font-size:14.5px;margin:0 0 12px}
+.hintform{display:grid;gap:9px}
+.hints button.fire{background:var(--sheet-ink);border-color:var(--sheet-ink);color:var(--sheet)}
+.hints button.fire:hover{background:var(--sheet-2);border-color:var(--sheet-2)}
+.hintform textarea{width:100%;min-height:78px;border:2px solid var(--sheet-line);border-radius:9px;padding:10px;background:var(--sheet-hover);color:var(--sheet-ink);font-family:inherit}
+.hintform .line{display:flex;align-items:center;gap:12px}
+.hintform .line span{font-size:13.5px;color:var(--sheet-2)}
+mjx-container{direction:ltr}
+
+dialog{border:2px solid var(--navy-line);border-radius:13px;background:var(--card);color:var(--ink);max-width:min(880px,94vw);padding:0}
+dialog::backdrop{background:rgba(20,20,20,.55)}
+dialog .dhead{display:flex;gap:12px;align-items:center;padding:13px 18px;border-bottom:2px solid var(--navy-line)}
+dialog .dhead strong{margin-inline-end:auto;font-size:19px;font-weight:800}
+dialog .dbody{padding:18px;max-height:74vh;overflow:auto}
+dialog img{max-width:100%;display:block;margin:0 auto 12px;background:#fff;border:2px solid var(--navy-line);border-radius:8px}
+.note{font-size:14.5px;color:var(--ink-2)}
+
+footer.bot{border-top:2px solid var(--navy-line);margin-top:34px;padding:18px 22px 34px;color:var(--ink-2);font-size:13.5px;text-align:center}
+.empty{text-align:center;color:var(--ink-2);padding:40px 0}
+@media (max-width:1040px){.fields{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:900px){.fields{grid-template-columns:repeat(2,1fr)}.mast nav{gap:18px;margin-inline-start:14px}.brand .tag{display:none}}
+@media (max-width:760px){.hero h1{font-size:28px}.minisearch.show{width:150px}}
+@media (max-width:620px){.fields{grid-template-columns:1fr}.hero{padding:22px 0 16px}.q{grid-template-columns:52px 1fr;padding:14px 16px}.q .num{font-size:26px}.mast nav{display:none}}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="mastin">
+    <span class="brand"><span class="name">גיבנק</span><span class="tag">שאלות · רמזים · התקדמות</span></span>
+    <nav>
+      <a href="#" id="navHome" class="sel">בית</a>
+      <a href="#" id="navAbout">Q&amp;A</a>
+      <a href="#" id="navHow">איך זה עובד</a>
+    </nav>
+    <span class="minisearch" id="mini">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="q2" type="search" placeholder="חיפוש" aria-label="חיפוש שאלות">
+    </span>
+    <span class="auth"><button id="btnLogin" type="button">כניסה</button><button id="btnJoin" class="solid" type="button">הרשמה</button></span>
+  </div>
+</header>
+
+<section class="hero" id="hero">
+  <div class="wrap">
+    <h1>איזה קורס אתם לומדים?</h1>
+    <p class="lede">חפשו לפי שם הקורס או לפי מספר הקורס.</p>
+    <div class="searchrow">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="cq" type="search" placeholder="חשבון אינפיניטסימלי 1, אינפי 1, 80131…" aria-label="חיפוש קורס"
+             autocomplete="off" enterkeyhint="search">
+    </div>
+    <div id="courseList" class="courses"></div>
+  </div>
+</section>
+
+<div id="app" hidden>
+<div class="coursebar"><div class="wrap">
+  <span class="cname" id="cName"></span>
+  <span class="cmeta" id="cMeta"></span>
+  <button id="changeCourse" type="button">החלפת קורס</button>
+</div></div>
+
+<div class="wrap controls">
+  <div class="searchrow qsearch">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <input id="q" type="search" placeholder="חיפוש בתוך הקורס: סופרמום, רציפות, ויירשטראס…" aria-label="חיפוש שאלות">
+  </div>
+  <div class="panel">
+    <div class="fields">
+      <label class="field"><span>נושא</span><span class="arrow"><select id="fTopic"></select></span></label>
+      <label class="field"><span>אופי השאלה</span><span class="arrow"><select id="fNature"></select></span></label>
+      <label class="field"><span>שנה</span><span class="arrow"><select id="fYear"></select></span></label>
+      <label class="field"><span>סמסטר</span><span class="arrow"><select id="fSem"></select></span></label>
+      <label class="field"><span>מועד</span><span class="arrow"><select id="fMoed"></select></span></label>
+      <label class="field"><span>מיון</span><span class="arrow"><select id="fSort"></select></span></label>
+    </div>
+    <hr>
+    <div class="row">
+      <label><input id="fHide" type="checkbox"> להסתיר שאלות שסיימתי</label>
+      <span class="grow"></span>
+      <button id="btnPdf" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="M8 8l4-4 4 4"/><path d="M4 16v3h16v-3"/></svg>
+        צרפו מבחן למאגר</button>
+      <input id="pdf" type="file" accept="application/pdf" multiple hidden>
+    </div>
+    <p class="pdfnote" id="pdfNote">נוסח השאלות הועתק מהשאלונים הסרוקים. אפשר לצרף את קבצי ה־PDF כדי לראות גם את הדף המקורי לצד כל שאלה.</p>
+  </div>
+
+  <div class="results">
+    <span class="n" id="count">—</span>
+    <span class="of" id="of"></span>
+    <span class="only">רמזים בלבד — בלי פתרונות מלאים</span>
+  </div>
+  <hr class="rule">
+  <div id="list"></div>
+</div>
+</div>
+
+<footer class="bot">
+  כל הזכויות על השאלות שמורות לאוניברסיטה העברית ©<br>
+  השאלות נכתבו על ידי סגל הקורס בשנה המצוינת בכל שאלה. הרמזים נכתבים על ידי סטודנטים — ייתכנו טעויות, קראו בעין ביקורתית.
+</footer>
+
+<dialog id="dlg"><div class="dhead"><strong id="dlgTitle"></strong><button type="button" id="dlgClose">סגירה</button></div><div class="dbody" id="dlgBody"></div></dialog>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+
+const EXAMS = {
+ "23a1":{n:1,y:2023,sem:"א",moed:"א",date:"05/02/2023",teach:"פרופ׳ קלואי פרין, פרופ׳ רז קופרמן, ד״ר איב גודין",file:"80131_2023_1_1_1.pdf",pick:"5 מתוך 6"},
+ "23a2":{n:2,y:2023,sem:"א",moed:"ב",date:"05/03/2023",teach:"פרופ׳ קלואי פרין, פרופ׳ רז קופרמן, ד״ר איב גודין",file:"80131_2023_1_2_1.pdf",pick:"5 מתוך 6"},
+ "23b1":{n:3,y:2023,sem:"ב",moed:"א",date:"16/07/2023",teach:"ד״ר יאיר חיות",file:"80131_2023_2_1_1.pdf",pick:"5 מתוך 6"},
+ "23b2":{n:4,y:2023,sem:"ב",moed:"ב",date:"13/08/2023",teach:"ד״ר יאיר חיות",file:"80131_2023_2_2_1.pdf",pick:"5 מתוך 6"},
+ "24a1":{n:5,y:2024,sem:"א",moed:"א",date:"27/03/2024",teach:"פרופ׳ קלואי פרין, פרופ׳ זמר קוזלוב, ד״ר איב גודין",file:"80131_2024_1_1_1.pdf",pick:"5 מתוך 6"},
+ "24a2":{n:6,y:2024,sem:"א",moed:"ב",date:"03/05/2024",teach:"פרופ׳ קלואי פרין, פרופ׳ זמר קוזלוב, ד״ר איב גודין",file:"80131_2024_1_2_1.pdf",pick:"5 מתוך 6"},
+ "24b1":{n:7,y:2024,sem:"ב",moed:"א",date:"14/08/2024",teach:"פרופ׳ מיכאל הוכמן",file:"80131_2024_2_1_2.pdf",pick:"5 מתוך 6"},
+ "24b2":{n:8,y:2024,sem:"ב",moed:"ב",date:"12/09/2024",teach:"פרופ׳ מיכאל הוכמן",file:"80131_2024_2_2_1.pdf",pick:"5 מתוך 6"},
+ "25a1":{n:9,y:2025,sem:"א",moed:"א",date:"11/02/2025",teach:"ד״ר נעה ניצן, פרופ׳ רז קופרמן, ד״ר איב גודין",file:"80131_2025_1_1_1.pdf",pick:"כל 5"},
+ "25a2":{n:10,y:2025,sem:"א",moed:"ב",date:"06/03/2025",teach:"ד״ר נעה ניצן, פרופ׳ רז קופרמן, ד״ר איב גודין",file:"80131_2025_1_2_1.pdf",pick:"כל 5"},
+ "25b1":{n:11,y:2025,sem:"ב",moed:"א",date:"21/07/2025",teach:"פרופ׳ צליל סלע",file:"80131_2025_2_1_1.pdf",pick:"כל 5"},
+ "25b2":{n:12,y:2025,sem:"ב",moed:"ב",date:"14/08/2025",teach:"פרופ׳ צליל סלע",file:"80131_2025_2_2_1.pdf",pick:"כל 5"}
+};
+
+const NATURE = { prove:"הוכחה", disprove:"הוכיחו או הפריכו", compute:"חישוב גבול",
+  example:"מצאו דוגמה", theorem:"משפט מההרצאה" };
+const TOPIC = { sup:"חסמים וסופרמום", sets:"קבוצות וקטעים", seq:"סדרות", seqdef:"הגדרת הגבול",
+  rec:"סדרות רקורסיביות", subseq:"תת־סדרות וגבולות חלקיים", series:"טורים",
+  flim:"גבולות של פונקציות", cont:"רציפות", mono:"מונוטוניות",
+  weier:"ויירשטראס", ivt:"ערך הביניים", deriv:"נגזרת", mvt:"משפטי ערך ממוצע" };
+const LEVEL = { easy:["קל",""], mid:["בינוני","mid"], hard:["מאתגר","hard"] };
+
+const P20="20 נק׳", PS="מתוך 20 נק׳";
+const SEED = [
+/* ---------- 2023 סמסטר א׳ מועד א׳ ---------- */
+{id:"23a1-1",ex:"23a1",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"easy",top:["seq","seqdef"],
+ title:"התכנסות של מנת פולינומים ישירות מההגדרה",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי $a_n=\\dfrac{2n^{4}+n^{3}+3}{n^{4}-5n-1}$ לכל $n\\in\\mathbb{N}$.\nהוכיחו ישירות מהגדרת הגבול שהסדרה $(a_n)_{n=1}^{\\infty}$ מתכנסת."},
+{id:"23a1-2",ex:"23a1",o:2,q:"2",s:"",pts:P20,nat:"prove",lvl:"mid",top:["seq","subseq"],
+ title:"תת־סדרה יורדת ממש בסדרה חיובית השואפת לאפס",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ סדרת מספרים חיוביים השואפת ל-$0$. הוכיחו שיש לה תת־סדרה יורדת ממש."},
+{id:"23a1-3a",ex:"23a1",o:3,q:"3",s:"א",pts:"15 נק׳",nat:"prove",lvl:"mid",top:["sup"],
+ title:"הסופרמום של הקבוצה $A-2A$",
+ ctx:"תהי $A$ קבוצה לא ריקה וחסומה של מספרים ממשיים. נסמן: $A-2A=\\{x-2y \\mid x,y\\in A\\}$.",
+ st:"א) הוכיחו ש-$A-2A$ חסומה מלעיל ושמתקיים $\\sup(A-2A)=\\sup(A)-2\\inf(A)$."},
+{id:"23a1-3b",ex:"23a1",o:4,q:"3",s:"ב",pts:"5 נק׳",nat:"disprove",lvl:"mid",top:["sup"],
+ title:"קיום מקסימום ל-$A-2A$ וקיום מקסימום ומינימום ל-$A$",
+ ctx:"תהי $A$ קבוצה לא ריקה וחסומה של מספרים ממשיים. נסמן: $A-2A=\\{x-2y \\mid x,y\\in A\\}$.",
+ st:"ב) הוכיחו או הפריכו: אם קיים $\\max(A-2A)$, אזי $\\max(A)$ ו-$\\min(A)$ קיימים שניהם."},
+{id:"23a1-4a",ex:"23a1",o:5,q:"4",s:"א",pts:"15 נק׳",nat:"disprove",lvl:"mid",top:["cont","mono"],
+ title:"רציפות הסכום $f+g$ ורציפות כל אחד מהמחוברים",
+ ctx:"יהי $x_0\\in\\mathbb{R}$ ויהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ פונקציות מונוטוניות עולות ב-$\\mathbb{R}$. הוכיחו או הפריכו את הטענות הבאות:",
+ st:"א) אם $f+g$ רציפה ב-$x_0$, אזי $f$ ו-$g$ רציפות ב-$x_0$."},
+{id:"23a1-4b",ex:"23a1",o:6,q:"4",s:"ב",pts:"5 נק׳",nat:"disprove",lvl:"hard",top:["cont","mono"],
+ title:"רציפות המכפלה $fg$ ורציפות אחד הגורמים",
+ ctx:"יהי $x_0\\in\\mathbb{R}$ ויהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ פונקציות מונוטוניות עולות ב-$\\mathbb{R}$. הוכיחו או הפריכו את הטענות הבאות:",
+ st:"ב) אם $fg$ רציפה ב-$x_0$, אזי $f$ רציפה ב-$x_0$ או $g$ רציפה ב-$x_0$."},
+{id:"23a1-5a",ex:"23a1",o:7,q:"5",s:"א",pts:"15 נק׳",nat:"prove",lvl:"hard",top:["flim","weier"],
+ title:"חסימות של פונקציה שכל גבולותיה קיימים במובן הצר",
+ ctx:"יהיו $a,b\\in\\mathbb{R}$ עם $a<b$. תהי $f:[a,b]\\to\\mathbb{R}$ פונקציה כך ש-$\\lim\\limits_{x\\to x_0}f(x)$ קיים במובן הצר עבור כל $x_0\\in[a,b]$ (כאשר $x_0\\in\\{a,b\\}$ מדובר בגבול חד־צדדי מהצד המתאים).",
+ st:"א) הוכיחו ש-$f$ חסומה ב-$[a,b]$. (תוכלו לשאוב השראה מהוכחת המשפט הראשון של ויירשטראס.)"},
+{id:"23a1-5b",ex:"23a1",o:8,q:"5",s:"ב",pts:"5 נק׳",nat:"disprove",lvl:"hard",top:["flim","weier"],
+ title:"האם פונקציה כזו משיגה מקסימום או מינימום",
+ ctx:"יהיו $a,b\\in\\mathbb{R}$ עם $a<b$. תהי $f:[a,b]\\to\\mathbb{R}$ פונקציה כך ש-$\\lim\\limits_{x\\to x_0}f(x)$ קיים במובן הצר עבור כל $x_0\\in[a,b]$ (כאשר $x_0\\in\\{a,b\\}$ מדובר בגבול חד־צדדי מהצד המתאים).",
+ st:"ב) הוכיחו או הפריכו: $f$ משיגה בהכרח ערך מקסימלי או ערך מינימלי."},
+{id:"23a1-6a",ex:"23a1",o:9,q:"6",s:"א",pts:"15 נק׳",nat:"prove",lvl:"mid",top:["series"],
+ title:"התכנסות הטור מתוך הסכומים החלקיים האי־זוגיים",
+ ctx:"נתונה סדרה $(a_n)_{n=1}^{\\infty}$ ותהי $(S_k)_{k=1}^{\\infty}$ סדרת הסכומים החלקיים של $(a_n)_{n=1}^{\\infty}$.",
+ st:"א) הוכיחו שאם $(S_{2k-1})_{k=1}^{\\infty}$ מתכנסת ו-$\\lim\\limits_{n\\to\\infty}a_n=0$, אזי $\\sum a_n$ מתכנס."},
+{id:"23a1-6b",ex:"23a1",o:10,q:"6",s:"ב",pts:"5 נק׳",nat:"disprove",lvl:"mid",top:["series"],
+ title:"התכנסות שתי סדרות הסכומים החלקיים",
+ ctx:"נתונה סדרה $(a_n)_{n=1}^{\\infty}$ ותהי $(S_k)_{k=1}^{\\infty}$ סדרת הסכומים החלקיים של $(a_n)_{n=1}^{\\infty}$.",
+ st:"ב) הוכיחו או הפריכו: אם $(S_{2k-1})_{k=1}^{\\infty}$ ו-$(S_{2k})_{k=1}^{\\infty}$ מתכנסות, אזי $\\sum a_n$ מתכנס."},
+
+/* ---------- 2023 סמסטר א׳ מועד ב׳ ---------- */
+{id:"23a2-1",ex:"23a2",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"mid",top:["seq","seqdef"],
+ title:"התכנסות סדרה עם שורשים ישירות מההגדרה",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי $a_n=\\dfrac{\\sqrt{n}+\\sqrt[3]{n}}{2\\sqrt{n}-7}$ לכל $n\\in\\mathbb{N}$.\nהוכיחו ישירות מהגדרת הגבול שהסדרה $(a_n)_{n=1}^{\\infty}$ מתכנסת."},
+{id:"23a2-2",ex:"23a2",o:2,q:"2",s:"",pts:P20,nat:"prove",lvl:"easy",top:["seq","subseq","mono"],
+ title:"סדרה עולה עם תת־סדרה מתכנסת",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה מונוטונית עולה. נתון שיש ל-$(a_n)_{n=1}^{\\infty}$ תת־סדרה מתכנסת. הוכיחו ש-$(a_n)_{n=1}^{\\infty}$ מתכנסת."},
+{id:"23a2-3a",ex:"23a2",o:3,q:"3",s:"א",pts:"8 נק׳",nat:"disprove",lvl:"mid",top:["flim"],
+ title:"אי־שוויון חלש בכל סביבה מנוקבת",
+ ctx:"יהי $x_0\\in\\mathbb{R}$ ויהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ פונקציות כך ש-$\\lim\\limits_{x\\to x_0}f(x)=L_1\\in\\mathbb{R}$ ו-$\\lim\\limits_{x\\to x_0}g(x)=L_2\\in\\mathbb{R}$.\nהוכיחו או הפריכו את הטענות הבאות:",
+ st:"א) אם בכל סביבה מנוקבת של $x_0$ קיימת נקודה $x$ כך ש-$f(x)\\leqslant g(x)$, אזי $L_1\\leqslant L_2$."},
+{id:"23a2-3b",ex:"23a2",o:4,q:"3",s:"ב",pts:"6 נק׳",nat:"disprove",lvl:"mid",top:["flim"],
+ title:"אי־שוויון חזק בכל סביבה מנוקבת",
+ ctx:"יהי $x_0\\in\\mathbb{R}$ ויהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ פונקציות כך ש-$\\lim\\limits_{x\\to x_0}f(x)=L_1\\in\\mathbb{R}$ ו-$\\lim\\limits_{x\\to x_0}g(x)=L_2\\in\\mathbb{R}$.\nהוכיחו או הפריכו את הטענות הבאות:",
+ st:"ב) אם בכל סביבה מנוקבת של $x_0$ קיימת נקודה $x$ כך ש-$f(x)<g(x)$, אזי $L_1<L_2$."},
+{id:"23a2-3c",ex:"23a2",o:5,q:"3",s:"ג",pts:"6 נק׳",nat:"disprove",lvl:"mid",top:["flim"],
+ title:"אי־שוויון חלש בכל סביבה מלאה",
+ ctx:"יהי $x_0\\in\\mathbb{R}$ ויהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ פונקציות כך ש-$\\lim\\limits_{x\\to x_0}f(x)=L_1\\in\\mathbb{R}$ ו-$\\lim\\limits_{x\\to x_0}g(x)=L_2\\in\\mathbb{R}$.\nהוכיחו או הפריכו את הטענות הבאות:",
+ st:"ג) אם בכל סביבה מלאה של $x_0$ קיימת נקודה $x$ כך ש-$f(x)\\leqslant g(x)$, אזי $L_1\\leqslant L_2$."},
+{id:"23a2-4",ex:"23a2",o:6,q:"4",s:"",pts:P20,nat:"prove",lvl:"mid",top:["cont","ivt"],
+ title:"נקודה שבה $f(c+h)=f(c)$ עבור פונקציה עם מקסימום",
+ st:"תהי $f:\\mathbb{R}\\to\\mathbb{R}$ פונקציה רציפה. נתון ש-$f$ משיגה ערך מקסימלי ב-$\\mathbb{R}$.\nבהינתן $0<h\\in\\mathbb{R}$, הוכיחו שקיים $c\\in\\mathbb{R}$ כך ש-$f(c+h)=f(c)$."},
+{id:"23a2-5",ex:"23a2",o:7,q:"5",s:"",pts:P20,nat:"prove",lvl:"hard",top:["sup","seq"],
+ title:"שקילות בין $\\sup(L)=\\inf(U)$ לקיום סדרות מתקרבות",
+ st:"יהיו $L,U\\subseteq\\mathbb{R}$ לא ריקות כך ש-$L\\leq U$ (כלומר, $\\forall\\ell\\in L\\ \\forall u\\in U\\ \\ \\ell\\leqslant u$).\nהוכיחו שהטענות הבאות שקולות:\n($\\heartsuit$) $\\sup(L)=\\inf(U)$.\n($\\diamond$) קיימות שתי סדרות $(u_n)_{n=1}^{\\infty}$ ו-$(\\ell_n)_{n=1}^{\\infty}$ כך ש-$\\ell_n\\in L$ ו-$u_n\\in U$ לכל $n$ ומתקיים $\\lim\\limits_{n\\to\\infty}(u_n-\\ell_n)=0$."},
+{id:"23a2-6a",ex:"23a2",o:8,q:"6",s:"א",pts:"8 נק׳",nat:"prove",lvl:"easy",top:["series"],
+ title:"התכנסות טור טלסקופי",
+ st:"א) תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי $a_n=\\dfrac{\\sqrt[3]{n+1}-\\sqrt[3]{n}}{\\sqrt[3]{n(n+1)}}=\\dfrac{1}{\\sqrt[3]{n}}-\\dfrac{1}{\\sqrt[3]{n+1}}$ לכל $n\\in\\mathbb{N}$.\nהוכיחו שהטור $\\sum a_n$ מתכנס."},
+{id:"23a2-6b",ex:"23a2",o:9,q:"6",s:"ב",pts:"12 נק׳",nat:"prove",lvl:"hard",top:["series"],
+ title:"התכנסות הטור $\\sum n^{-4/3}$ בעזרת סעיף א׳",
+ st:"ב) היעזרו בסעיף א׳ ובזהות $a^{3}-b^{3}=(a-b)\\left(a^{2}+ab+b^{2}\\right)$ כדי להראות שהטור $\\sum\\dfrac{1}{n^{4/3}}$ מתכנס."},
+
+/* ---------- 2023 סמסטר ב׳ מועד א׳ ---------- */
+{id:"23b1-1a",ex:"23b1",o:1,q:"1",s:"א",pts:"10 נק׳",nat:"prove",lvl:"mid",top:["seq"],
+ title:"הגבול של השורש ה-$n$-י של סדרה מתכנסת",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה ויהי $L$ מספר ממשי, $0<L$.",
+ st:"א) הוכיחו שאם $0\\leqslant a_n$ עבור כל $n$ טבעי ו-$(a_n)_{n=1}^{\\infty}$ מתכנסת ל-$L$, אזי הסדרה $\\left(\\sqrt[n]{a_n}\\right)_{n=1}^{\\infty}$ מתכנסת ל-$1$."},
+{id:"23b1-1b",ex:"23b1",o:2,q:"1",s:"ב",pts:"10 נק׳",nat:"example",lvl:"mid",top:["seq"],
+ title:"דוגמה נגדית כשהגבול אינו חיובי",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה ויהי $L$ מספר ממשי, $0<L$.",
+ st:"ב) מצאו סדרה מתכנסת $(a_n)_{n=1}^{\\infty}$ כך שלכל $n$, $a_n>0$ אבל הסדרה $\\left(\\sqrt[n]{a_n}\\right)_{n=1}^{\\infty}$ לא מתכנסת ל-$1$."},
+{id:"23b1-2a",ex:"23b1",o:3,q:"2",s:"א",pts:"12 נק׳",nat:"prove",lvl:"mid",top:["sup"],
+ title:"הסופרמום של קבוצת ההפכיים",
+ ctx:"תהי $B\\subseteq\\mathbb{R}$ לא ריקה.",
+ st:"א) נניח כי קיים $0<c$ כך שמתקיים $B\\subseteq[c,\\infty)$. נגדיר $\\dfrac{1}{B}=\\left\\{\\dfrac{1}{b}\\ \\middle|\\ b\\in B\\right\\}$.\nהוכיחו כי $\\sup\\left(\\dfrac{1}{B}\\right)=\\dfrac{1}{\\inf(B)}$. (נמקו במפורש מדוע כל הביטויים מוגדרים היטב)."},
+{id:"23b1-2b",ex:"23b1",o:4,q:"2",s:"ב",pts:"8 נק׳",nat:"example",lvl:"mid",top:["sup"],
+ title:"קבוצה שבה השוויון נשבר",
+ ctx:"תהי $B\\subseteq\\mathbb{R}$ לא ריקה.",
+ st:"ב) הוכיחו כי קיימת $B\\subseteq\\mathbb{R}\\setminus\\{0\\}$ לא ריקה כך ש-$\\sup\\left(\\dfrac{1}{B}\\right)$ קיים, $\\inf(B)$ קיים אך מתקיים $\\sup\\left(\\dfrac{1}{B}\\right)\\neq\\dfrac{1}{\\inf(B)}$."},
+{id:"23b1-3a",ex:"23b1",o:5,q:"3",s:"א",pts:"10 נק׳",nat:"prove",lvl:"easy",top:["cont"],
+ title:"רציפות פונקציית השורש בכל תחום הגדרתה",
+ st:"א) תהי $r:[0,\\infty)\\to[0,\\infty)$ המוגדרת על ידי $r(x)=\\sqrt{x}$. הוכיחו כי $r$ רציפה בכל תחום הגדרתה (כלומר, $r$ רציפה בכל $x_0$ חיובי ורציפה מימין ב-$0$)."},
+{id:"23b1-3b",ex:"23b1",o:6,q:"3",s:"ב",pts:"10 נק׳",nat:"prove",lvl:"mid",top:["cont"],
+ title:"רציפות $h$ מתוך רציפות $h^2$",
+ st:"ב) תהי $h:\\mathbb{R}\\to\\mathbb{R}$ פונקציה המוגדרת בסביבה של $x_0$ ונניח כי הפונקציה $f(x)=(h(x))^{2}$ רציפה ב-$x_0$. נניח בנוסף כי לכל $x$ מתקיים כי $h(x)>0$. הוכיחו כי $h$ רציפה ב-$x_0$."},
+{id:"23b1-4",ex:"23b1",o:7,q:"4",s:"",pts:P20,nat:"theorem",lvl:"mid",top:["weier","cont"],
+ title:"המשפט השני של ויירשטראס",
+ st:"תהי $f:[a,b]\\to\\mathbb{R}$ פונקציה רציפה.\nהוכיחו את המשפט השני של ויירשטראס: הוכיחו כי קיימים $c,d\\in[a,b]$ כך שמתקיים\n$$\\forall x\\in[a,b],\\quad f(c)\\leq f(x)\\leq f(d)$$\nניתן להשתמש במשפט הראשון של ויירשטראס בהוכחה."},
+{id:"23b1-5",ex:"23b1",o:8,q:"5",s:"",pts:P20,nat:"prove",lvl:"hard",top:["rec","seq"],
+ title:"סדרת הרון והשורש הריבועי",
+ st:"יהי $0\\leq x$ ותהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי כלל הנסיגה,\n$$a_1=x+1,\\qquad \\forall n\\in\\mathbb{N},\\ a_{n+1}=\\frac{1}{2}\\left(a_n+\\frac{x}{a_n}\\right)$$\nהוכיחו כי הסדרה $(a_n)_{n=1}^{\\infty}$ מתכנסת וחשבו את גבולה כתלות בפרמטר $x$."},
+{id:"23b1-6a",ex:"23b1",o:9,q:"6",s:"א",pts:"15 נק׳",nat:"prove",lvl:"mid",top:["subseq","sup"],
+ title:"הסופרמום כגבול חלקי כשאין איבר מקסימלי",
+ st:"א) תהי $(a_n)_{n=1}^{\\infty}$ סדרה חסומה, ונניח כי לקבוצה $\\{a_n\\mid n\\in\\mathbb{N}\\}$ לא קיים איבר מקסימלי.\nהוכיחו כי $\\sup\\{a_n\\mid n\\in\\mathbb{N}\\}$ הוא גבול חלקי של הסדרה $(a_n)_{n=1}^{\\infty}$."},
+{id:"23b1-6b",ex:"23b1",o:10,q:"6",s:"ב",pts:"5 נק׳",nat:"example",lvl:"easy",top:["subseq"],
+ title:"סדרה חסומה ומתבדרת ללא מקסימום",
+ st:"ב) מצאו סדרה $(a_n)_{n=1}^{\\infty}$ שהיא חסומה ומתבדרת, כך שלקבוצה $\\{a_n\\mid n\\in\\mathbb{N}\\}$ אין מקסימום."},
+
+/* ---------- 2023 סמסטר ב׳ מועד ב׳ ---------- */
+{id:"23b2-1",ex:"23b2",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"hard",top:["cont","sets"],
+ title:"רציפות הפונקציה ההפוכה על מקטע",
+ st:"יהי $I\\subseteq\\mathbb{R}$ מקטע לא ריק (היזכרו כי $I$ הוא מקטע אם ורק אם מתקיים כי לכל $x,y\\in I$ אם $x<y$ אזי $[x,y]\\subseteq I$).\nתהי $f:I\\to\\mathbb{R}$ חד חד ערכית ורציפה. נסמן\n$$J=\\{f(x)\\mid x\\in I\\}$$\nהוכיחו כי קיימת פונקציה רציפה $g:J\\to I$ כך ש-$g(f(x))=x$ לכל $x\\in I$."},
+{id:"23b2-2",ex:"23b2",o:2,q:"2",s:"",pts:P20,nat:"prove",lvl:"mid",top:["subseq","seq"],
+ title:"התכנסות מתוך תת־תת־סדרות מתכנסות",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה ויהי $L\\in\\mathbb{R}$.\nנניח כי לכל סדרה $(b_k)_{k=1}^{\\infty}$ שהיא תת סדרה של $(a_n)_{n=1}^{\\infty}$, קיימת סדרה $(c_m)_{m=1}^{\\infty}$ שהיא תת סדרה של $(b_k)_{k=1}^{\\infty}$ ומתכנסת ל-$L$.\nהוכיחו כי $(a_n)_{n=1}^{\\infty}$ מתכנסת ל-$L$."},
+{id:"23b2-3",ex:"23b2",o:3,q:"3",s:"",pts:P20,nat:"compute",lvl:"hard",top:["subseq"],unc:true,
+ title:"כל הגבולות החלקיים במובן הרחב של סדרה מפוצלת",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי\n$$a_n=\\begin{cases}2-\\tfrac{1}{n} & \\exists k\\in\\mathbb{N},\\ n=k^{2}\\\\[2pt] \\dfrac{(-1)^{n}\\,n}{n-\\sqrt{n}} & \\text{אחרת}\\end{cases}$$\nמצאו את כל הגבולות החלקיים במובן הרחב של הסדרה $(a_n)_{n=1}^{\\infty}$. נמקו והוכיחו את טענותיכם."},
+{id:"23b2-4",ex:"23b2",o:4,q:"4",s:"",pts:P20,nat:"prove",lvl:"hard",top:["sup","sets"],
+ title:"קבוצה צפופה וסגורה לסופרמום היא כל הישר",
+ st:"תהי $A\\subseteq\\mathbb{R}$ המקיימת\nא. $A$ צפופה ב-$\\mathbb{R}$ (כלומר, לכל $x,y\\in\\mathbb{R}$ אם $x<y$ אז קיים $a\\in A$ כך ש-$x<a<y$) וגם\nב. לכל $B\\subseteq A$ חסומה מלעיל ולא ריקה, מתקיים $\\sup B\\in A$.\nהוכיחו כי $A=\\mathbb{R}$."},
+{id:"23b2-5",ex:"23b2",o:5,q:"5",s:"",pts:P20,nat:"prove",lvl:"mid",top:["flim"],
+ title:"שקילות בין הגבול מימין לגבול של $f(x^2)$",
+ st:"תהי $f$ פונקציה המוגדרת בסביבה ימנית מנוקבת של $0$.\nהוכיחו כי הגבול החד צדדי $\\lim\\limits_{x\\to 0^{+}}f(x)$ קיים אם ורק אם הגבול $\\lim\\limits_{x\\to 0}f\\left(x^{2}\\right)$ קיים, ואם הם קיימים הם שווים זה לזה."},
+{id:"23b2-6",ex:"23b2",o:6,q:"6",s:"",pts:P20,nat:"prove",lvl:"hard",top:["ivt","cont"],
+ title:"כל ערך מתקבל כמנה $f(c)/g(c)$",
+ st:"יהו $f,g:[a,b]\\to\\mathbb{R}$ פונקציות רציפות. נניח כי $f(a)=-1$, $f(b)=1$. נניח בנוסף כי $g(a)=g(b)=0$ וכי לכל $x\\in(a,b)$ מתקיים כי $g(x)\\neq 0$.\nהוכיחו כי לכל $\\lambda\\in\\mathbb{R}$ קיים $c\\in(a,b)$ כך שמתקיים $\\lambda=\\dfrac{f(c)}{g(c)}$."},
+
+/* ---------- 2024 סמסטר א׳ מועד א׳ ---------- */
+{id:"24a1-1",ex:"24a1",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"mid",top:["sets","sup"],
+ title:"כל מקטע הוא קטע — המקרה החסום מלעיל בלבד",
+ st:"תהי $\\emptyset\\neq A\\subseteq\\mathbb{R}$ המקיימת $\\forall a_1,a_2\\in A\\ \\forall x\\in\\mathbb{R}\\ \\ a_1\\leqslant x\\leqslant a_2\\Rightarrow x\\in A$, כלומר $A$ מקטע של $\\mathbb{R}$.\nהוכיחו את המקרה הבא של המשפט ״כל מקטע הוא קטע״:\nאם $A$ חסומה מלעיל אך לא מלרע, אזי קיים $\\beta\\in\\mathbb{R}$ כך ש-$A$ שווה לאחת הקבוצות $(-\\infty,\\beta]$, $(-\\infty,\\beta)$."},
+{id:"24a1-2",ex:"24a1",o:2,q:"2",s:"",pts:P20,nat:"prove",lvl:"easy",top:["rec","seq"],
+ title:"התכנסות סדרה רקורסיבית וחישוב גבולה",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי $a_1=0$ ו-$a_{n+1}=\\dfrac{1+a_n}{2+a_n}$ לכל $n\\in\\mathbb{N}$.\nהוכיחו שהסדרה $(a_n)_{n=1}^{\\infty}$ מתכנסת וחשבו את גבולה."},
+{id:"24a1-3",ex:"24a1",o:3,q:"3",s:"",pts:P20,nat:"prove",lvl:"hard",top:["subseq"],
+ title:"קבוצת הגבולות החלקיים אינה משתנה בכפל בסדרה השואפת ל-1",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה חסומה. נסמן ב-$S_a$ את קבוצת הגבולות החלקיים של $(a_n)_{n=1}^{\\infty}$.\nהוכיחו שאם סדרה $(b_n)_{n=1}^{\\infty}$ מתכנסת ל-$1$, אזי $S_{ab}=S_a$.\n($S_{ab}$ מסמן את קבוצת הגבולות החלקיים של $(a_n\\cdot b_n)_{n=1}^{\\infty}$.)"},
+{id:"24a1-4",ex:"24a1",o:4,q:"4",s:"",pts:P20,nat:"prove",lvl:"mid",top:["flim"],
+ title:"גבול של הרכבה באמצעות אפיון היינה",
+ st:"יהיו $x_0,y_0,L\\in\\mathbb{R}$.\nתהי $f:\\mathbb{R}\\to\\mathbb{R}$ פונקציה כך ש-$\\lim\\limits_{x\\to x_0}f(x)=y_0$ ותהי $g:\\mathbb{R}\\to\\mathbb{R}$ פונקציה כך ש-$\\lim\\limits_{y\\to y_0}g(y)=L$.\nנתון גם שקיימת סביבה מנוקבת $U$ של $x_0$ כך ש-$f(x)\\neq y_0$ עבור כל $x$ ב-$U$.\nהוכיחו באמצעות אפיון היינה ש-$\\lim\\limits_{x\\to x_0}g(f(x))=L$."},
+{id:"24a1-5",ex:"24a1",o:5,q:"5",s:"",pts:P20,nat:"compute",lvl:"mid",top:["cont"],
+ title:"נקודות אי־רציפות כתלות בפרמטר",
+ st:"יהי $\\alpha\\in\\mathbb{R}$ ותהי $f:\\mathbb{R}\\to\\mathbb{R}$ הפונקציה\n$$f(x)=\\begin{cases}\\dfrac{x^{2}-6x+\\alpha}{x-3} & x\\neq 3\\\\[4pt] 0 & x=3\\end{cases}$$\nעבור כל ערך נתון של הפרמטר $\\alpha$, מצאו את כל נקודות אי־הרציפות של $f$."},
+{id:"24a1-6a",ex:"24a1",o:6,q:"6",s:"א",pts:PS,nat:"prove",lvl:"easy",top:["cont"],
+ title:"רציפות של פונקציה מכווצת",
+ ctx:"נתונים $a,b\\in\\mathbb{R}$ עם $a<b$ ו-$f:[a,b]\\to\\mathbb{R}$ המקיימת $\\forall x,x'\\in[a,b]\\ \\ |f(x)-f(x')|<|x-x'|$.",
+ st:"א) הוכיחו כי $f$ רציפה ב-$[a,b]$."},
+{id:"24a1-6b",ex:"24a1",o:7,q:"6",s:"ב",pts:PS,nat:"prove",lvl:"mid",top:["ivt","cont"],
+ title:"נקודת שבת יחידה",
+ ctx:"נתונים $a,b\\in\\mathbb{R}$ עם $a<b$ ו-$f:[a,b]\\to\\mathbb{R}$ המקיימת $\\forall x,x'\\in[a,b]\\ \\ |f(x)-f(x')|<|x-x'|$.",
+ st:"ב) בסעיף זה נתון גם ש-$a\\leqslant f(x)\\leqslant b$ לכל $x\\in[a,b]$. הוכיחו כי קיים $c\\in[a,b]$ יחיד כך ש-$f(c)=c$."},
+
+/* ---------- 2024 סמסטר א׳ מועד ב׳ ---------- */
+{id:"24a2-1",ex:"24a2",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"mid",top:["flim","seqdef"],
+ title:"גבול פונקציה ישירות בלשון אפסילון־דלתא",
+ st:"תהי $f:\\mathbb{R}\\setminus\\left\\{\\tfrac{1}{3}\\right\\}\\to\\mathbb{R}$ הפונקציה מוגדרת על ידי $f(x)=\\dfrac{x^{2}+5x-2}{3x-1}$.\nהוכיחו ישירות מהגדרת הגבול בלשון אפסילון־דלתא ש-$\\lim\\limits_{x\\to 0}f(x)=2$."},
+{id:"24a2-2",ex:"24a2",o:2,q:"2",s:"",pts:P20,nat:"prove",lvl:"mid",top:["sup"],
+ title:"הסופרמום של קבוצת המרחקים שווה לתחום",
+ st:"תהי $\\emptyset\\neq A\\subseteq\\mathbb{R}$ קבוצה חסומה. הוכיחו ש-$\\sup\\left(\\left\\{|x-y|\\ \\middle|\\ x,y\\in A\\right\\}\\right)=\\sup(A)-\\inf(A)$."},
+{id:"24a2-3a",ex:"24a2",o:3,q:"3",s:"א",pts:PS,nat:"prove",lvl:"mid",top:["rec","seq"],
+ title:"חסימות של הסדרה הרקורסיבית",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המקיימת $a_1\\in(0,2)$ ו-$a_{n+1}=\\dfrac{a_n}{2}+\\dfrac{a_n^{2}}{4}$ לכל $n\\in\\mathbb{N}$.",
+ st:"א) הוכיחו ש-$(a_n)_{n=1}^{\\infty}$ חסומה."},
+{id:"24a2-3b",ex:"24a2",o:4,q:"3",s:"ב",pts:PS,nat:"prove",lvl:"mid",top:["rec","seq"],
+ title:"התכנסות הסדרה הרקורסיבית וגבולה",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המקיימת $a_1\\in(0,2)$ ו-$a_{n+1}=\\dfrac{a_n}{2}+\\dfrac{a_n^{2}}{4}$ לכל $n\\in\\mathbb{N}$.",
+ st:"ב) הוכיחו ש-$(a_n)_{n=1}^{\\infty}$ מתכנסת ומצאו את גבולה."},
+{id:"24a2-4a",ex:"24a2",o:5,q:"4",s:"א",pts:PS,nat:"prove",lvl:"mid",top:["seq"],
+ title:"אי־שוויון בין הפרשים לאורך $p$ צעדים",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה מונוטונית עולה ותהי $(b_n)_{n=1}^{\\infty}$ סדרה המקיימת $|b_{n+1}-b_n|\\leqslant a_{n+1}-a_n$ לכל $n\\in\\mathbb{N}$.",
+ st:"א) הוכיחו שלכל $n\\in\\mathbb{N}$ ולכל $p\\in\\mathbb{N}$ מתקיים $|b_{n+p}-b_n|\\leqslant a_{n+p}-a_n$."},
+{id:"24a2-4b",ex:"24a2",o:6,q:"4",s:"ב",pts:PS,nat:"prove",lvl:"mid",top:["seq"],
+ title:"התכנסות $(b_n)$ מתוך חסימות $(a_n)$",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה מונוטונית עולה ותהי $(b_n)_{n=1}^{\\infty}$ סדרה המקיימת $|b_{n+1}-b_n|\\leqslant a_{n+1}-a_n$ לכל $n\\in\\mathbb{N}$.",
+ st:"ב) נתון גם שהסדרה $(a_n)_{n=1}^{\\infty}$ חסומה מלעיל. הוכיחו כי הסדרה $(b_n)_{n=1}^{\\infty}$ מתכנסת."},
+{id:"24a2-5",ex:"24a2",o:7,q:"5",s:"",pts:P20,nat:"prove",lvl:"mid",top:["weier","flim"],
+ title:"מקסימום בקרן כשהגבול באינסוף קטן מ-$f(0)$",
+ st:"יהי $L\\in\\mathbb{R}$ ותהי $f:[0,\\infty)\\to\\mathbb{R}$ פונקציה רציפה המקיימת $\\lim\\limits_{x\\to\\infty}f(x)=L<f(0)$.\nהוכיחו כי $f$ משיגה ערך מקסימלי ב-$[0,\\infty)$."},
+{id:"24a2-6a",ex:"24a2",o:8,q:"6",s:"א",pts:PS,nat:"prove",lvl:"mid",top:["mono","flim"],
+ title:"קיום הגבולות החד־צדדיים של הפרש פונקציות עולות",
+ ctx:"יהי $x_0\\in\\mathbb{R}$ ויהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ פונקציות מונוטוניות עולות ב-$\\mathbb{R}$.",
+ st:"א) הוכיחו ששני הגבולות החד־צדדיים של $f-g$ ב-$x_0$ קיימים במובן הצר."},
+{id:"24a2-6b",ex:"24a2",o:9,q:"6",s:"ב",pts:PS,nat:"disprove",lvl:"hard",top:["mono","flim"],
+ title:"האם התאפסות הגבולות גוררת שוויון בנקודה",
+ ctx:"יהי $x_0\\in\\mathbb{R}$ ויהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ פונקציות מונוטוניות עולות ב-$\\mathbb{R}$.",
+ st:"ב) הוכיחו או הפריכו: אם $\\lim\\limits_{x\\to t^{-}}(g-f)(x)=0=\\lim\\limits_{x\\to t^{+}}(g-f)(x)$ עבור כל $t\\in\\mathbb{R}$, אזי $f(x_0)=g(x_0)$."},
+
+/* ---------- 2024 סמסטר ב׳ מועד א׳ ---------- */
+{id:"24b1-1",ex:"24b1",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"mid",top:["seq","seqdef"],
+ title:"התכנסות סדרה מעריכית מהגדרת הגבול",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה\n$$a_n=\\frac{1}{n}2^{5n-n^{2}}$$\nהוכיחו מהגדרת הגבול שהסדרה מתכנסת וחשבו את גבולה."},
+{id:"24b1-2",ex:"24b1",o:2,q:"2",s:"",pts:P20,nat:"disprove",lvl:"mid",top:["subseq","sup"],
+ title:"תת־סדרה עולה המתכנסת לסופרמום",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה חסומה. יהי $s=\\sup\\{a_n\\mid n\\in\\mathbb{N}\\}$ ונניח שלכל $n\\in\\mathbb{N}$ מתקיים $a_n\\neq s$.\nהוכיחו או הפריכו: קיימת תת־סדרה עולה של $(a_n)_{n=1}^{\\infty}$ המתכנסת ל-$s$."},
+{id:"24b1-3",ex:"24b1",o:3,q:"3",s:"",pts:P20,nat:"prove",lvl:"mid",top:["rec","seq"],
+ title:"סדרה רקורסיבית עם שורש",
+ st:"נגדיר סדרה $(a_n)_{n=1}^{\\infty}$ בצורה רקורסיבית על־ידי $a_1=3$, $a_{n+1}=\\tfrac{1}{2}\\left(a_n+\\sqrt{a_n}\\right)$ לכל $n\\in\\mathbb{N}$.\nהוכיחו ש-$(a_n)_{n=1}^{\\infty}$ מתכנסת וחשבו את הגבול. הוכיחו את תשובתכם."},
+{id:"24b1-4a",ex:"24b1",o:4,q:"4",s:"א",pts:PS,nat:"prove",lvl:"hard",top:["flim"],
+ title:"התבדרות לאינסוף בשני קצות הקרן",
+ ctx:"תהי $f:(0,\\infty)\\to\\mathbb{R}$ פונקציה רציפה בכל נקודה, ונניח ש-$\\lim\\limits_{x\\to\\infty}\\dfrac{f(x)}{x}=\\infty$ וגם $\\lim\\limits_{x\\to 0^{+}}x f(x)=1$.",
+ st:"א. הוכיחו ש-$\\lim\\limits_{x\\to 0^{+}}f(x)=\\infty$ וגם $\\lim\\limits_{x\\to\\infty}f(x)=\\infty$."},
+{id:"24b1-4b",ex:"24b1",o:5,q:"4",s:"ב",pts:PS,nat:"prove",lvl:"hard",top:["weier","flim"],
+ title:"קבלת מינימום בקרן הפתוחה",
+ ctx:"תהי $f:(0,\\infty)\\to\\mathbb{R}$ פונקציה רציפה בכל נקודה, ונניח ש-$\\lim\\limits_{x\\to\\infty}\\dfrac{f(x)}{x}=\\infty$ וגם $\\lim\\limits_{x\\to 0^{+}}x f(x)=1$.",
+ st:"ב. הוכיחו ש-$f$ מקבלת מינימום ב-$(0,\\infty)$."},
+{id:"24b1-5",ex:"24b1",o:6,q:"5",s:"",pts:P20,nat:"prove",lvl:"hard",top:["flim","cont"],
+ title:"קיום הגבול של $f$ מתוך קיום הגבול של $g\\circ f$",
+ st:"יהיו $f,g:\\mathbb{R}\\to\\mathbb{R}$ ונניח ש-$g$ נתונה על־ידי\n$$g(x)=\\begin{cases}x-1 & x<0\\\\[2pt] x & x\\geq 0\\end{cases}$$\nהוכיחו שאם $\\lim\\limits_{x\\to 0}g\\circ f(x)$ קיים, אז $\\lim\\limits_{x\\to 0}f$ קיים."},
+{id:"24b1-6",ex:"24b1",o:7,q:"6",s:"",pts:P20,nat:"prove",lvl:"hard",top:["ivt","cont"],
+ title:"התמונה של פונקציה רציפה וחסומה ללא קיצון",
+ st:"תהי $f$ פונקציה ממשית אשר רציפה וחסומה בקטע $(a,b)$. נתון ש-$f$ לא מקבלת מקסימום או מינימום ב-$(a,b)$. הוכיחו שהתמונה שלה הוא קטע פתוח וחסום.\nאין להסתמך על המשפט שתמונה של פונקציה רציפה בקטע הוא קטע, אלא אם מוכיחים את החלק הרלוונטי ממנו."},
+
+/* ---------- 2024 סמסטר ב׳ מועד ב׳ ---------- */
+{id:"24b2-1a",ex:"24b2",o:1,q:"1",s:"א",pts:"10 נק׳",nat:"prove",lvl:"easy",top:["seq","seqdef"],
+ title:"התבדרות לאינסוף ישירות מההגדרה",
+ ctx:"עבור $n\\in\\mathbb{N}$ יהי $a_n=n^{3}-2n$.",
+ st:"א. הוכיחו מההגדרה $\\lim\\limits_{n\\to\\infty}a_n=\\infty$."},
+{id:"24b2-1b",ex:"24b2",o:2,q:"1",s:"ב",pts:"10 נק׳",nat:"compute",lvl:"mid",top:["seq"],
+ title:"עבור אילו חזקות $n^k$ הסדרה מתכנסת",
+ ctx:"עבור $n\\in\\mathbb{N}$ יהי $a_n=n^{3}-2n$.",
+ st:"ב. קבעו לאילו $k\\in\\mathbb{N}$ הסדרה $b_n=a_n/n^{k}$ מתכנסת (במובן הצר), וכשיש התכנסות מצאו את הגבול.\nבסעיף (ב) זה מותר להשתמש בכל משפט מהקורס."},
+{id:"24b2-2",ex:"24b2",o:3,q:"2",s:"",pts:P20,nat:"prove",lvl:"easy",top:["sup"],
+ title:"הסופרמום של קבוצת ההפכיים בתת־קבוצה של $[1,2]$",
+ st:"תהי $A\\subseteq[1,2]$ קבוצה לא ריקה, ונגדיר $B=\\left\\{\\tfrac{1}{x}\\mid x\\in A\\right\\}$. נסמן $s=\\inf A$.\nנמקו בקצרה מדוע $s$ מוגדר היטב ומדוע $s\\neq 0$, והוכיחו ש-$\\sup B=1/s$. מותר להשתמש בכל משפט מהקורס."},
+{id:"24b2-3a",ex:"24b2",o:4,q:"3",s:"א",pts:"10 נק׳",nat:"example",lvl:"mid",top:["seq"],
+ title:"דוגמה שבה $(a_n)$ מתכנסת אך $(b_n)$ מתבדרת",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה ממשית ותהי\n$$b_n=\\frac{[a_n]}{\\{a_n\\}+1}$$\nכאשר $[x]$ מסמן את החלק השלם (התחתון) של $x$ ואילו $\\{x\\}=x-[x]$ הוא החלק השבור.",
+ st:"א. תנו דוגמא שבה $(a_n)_{n=1}^{\\infty}$ מתכנסת אבל $(b_n)_{n=1}^{\\infty}$ מתבדרת (הוכיחו את תשובתכם)."},
+{id:"24b2-3b",ex:"24b2",o:5,q:"3",s:"ב",pts:"10 נק׳",nat:"prove",lvl:"hard",top:["subseq","seq"],
+ title:"הגבולות החלקיים האפשריים כאשר $b_n\\to 1$",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ סדרה ממשית ותהי\n$$b_n=\\frac{[a_n]}{\\{a_n\\}+1}$$\nכאשר $[x]$ מסמן את החלק השלם (התחתון) של $x$ ואילו $\\{x\\}=x-[x]$ הוא החלק השבור.",
+ st:"ב. נניח ש-$b_n\\xrightarrow[n\\to\\infty]{}1$ ויהי $L\\in\\mathbb{R}$ גבול חלקי של $(a_n)_{n=1}^{\\infty}$. הוכיחו ש-$L\\in\\{1,3\\}$.\nהצעה: תחילה הוכיחו $L\\in\\mathbb{Z}$."},
+{id:"24b2-4",ex:"24b2",o:6,q:"4",s:"",pts:P20,nat:"prove",lvl:"hard",top:["mono","flim"],
+ title:"אי־חסימות משני הכיוונים לפונקציה עולה",
+ st:"תהי $f:\\mathbb{R}\\to\\mathbb{R}$ פונקציה עולה, ונניח ש-$\\lim\\limits_{x\\to\\infty}\\dfrac{f(x)}{f(-x)}=-1$. הוכיחו שאם $f$ אינה חסומה מלעיל, אז היא אינה חסומה מלרע."},
+{id:"24b2-5",ex:"24b2",o:7,q:"5",s:"",pts:P20,nat:"prove",lvl:"hard",top:["cont","ivt"],
+ title:"מונוטוניות מתוך היעדר קיצון בכל קטע",
+ st:"תהי $f:\\mathbb{R}\\to\\mathbb{R}$ פונקציה אשר רציפה בכל נקודה ב-$\\mathbb{R}$. נניח שלכל $a<b$ ממשיים $f$ אינה מקבלת מקסימום או מינימום בקטע $(a,b)$, ושמתקיים $f(0)<f(1)$.\nהוכיחו, שלכל $x>0$ מתקיים $f(x)>f(0)$ ולכל $x<0$ מתקיים $f(x)<f(0)$."},
+{id:"24b2-6",ex:"24b2",o:8,q:"6",s:"",pts:P20,nat:"prove",lvl:"hard",top:["cont","sets"],
+ title:"רציפות של הפונקציה המאפיינת המעריכית",
+ st:"תהי $A\\subseteq\\mathbb{R}$ קבוצה נגדיר $g:\\mathbb{R}\\to\\mathbb{R}$ על ידי\n$$g(x)=\\begin{cases}e^{x} & x\\in A\\\\[2pt] 0 & x\\notin A\\end{cases}$$\nהראו שאם $g$ רציפה ב-$x_0\\in\\mathbb{R}$ אז קיים $r>0$ כך שמתקיימת אחת מההכלות $B_r(x_0)\\subseteq\\mathbb{R}\\setminus A$ או $B_r(x_0)\\subseteq A$."},
+
+/* ---------- 2025 סמסטר א׳ מועד א׳ ---------- */
+{id:"25a1-1",ex:"25a1",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"mid",top:["sup","seq"],
+ title:"סדרה עולה ממש מתוך הקבוצה המתכנסת לסופרמום",
+ st:"הוכיחו: אם $\\emptyset\\neq A\\subseteq\\mathbb{R}$ חסומה מלעיל ו-$\\sup(A)\\notin A$,\nאז קיימת סדרה $(a_n)_{n=1}^{\\infty}$ המקיימת את שלושת התנאים הבאים:\n(i) $\\forall n\\in\\mathbb{N}\\quad a_n\\in A$\n(ii) $\\forall n\\in\\mathbb{N}\\quad a_n<a_{n+1}$\n(iii) $\\lim\\limits_{n\\to\\infty}a_n=\\sup(A)$"},
+{id:"25a1-2a",ex:"25a1",o:2,q:"2",s:"א",pts:PS,nat:"compute",lvl:"easy",top:["seq"],
+ title:"התכנסות הסדרה באמצעות אריתמטיקה של גבולות",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי $a_n=\\sqrt{n^{2}+2n}-n$ לכל $n\\in\\mathbb{N}$.",
+ st:"א) היעזרו באריתמטיקה של גבולות כדי להוכיח ש-$(a_n)_{n=1}^{\\infty}$ מתכנסת וכדי למצוא את $\\lim\\limits_{n\\to\\infty}a_n$."},
+{id:"25a1-2b",ex:"25a1",o:3,q:"2",s:"ב",pts:PS,nat:"prove",lvl:"mid",top:["seq","seqdef"],
+ title:"הוכחת אותו גבול ישירות מהגדרת הגבול",
+ ctx:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי $a_n=\\sqrt{n^{2}+2n}-n$ לכל $n\\in\\mathbb{N}$.",
+ st:"ב) הוכיחו ישירות מהגדרת הגבול שהסדרה $(a_n)_{n=1}^{\\infty}$ מתכנסת למספר שמצאתם בסעיף א׳."},
+{id:"25a1-3",ex:"25a1",o:4,q:"3",s:"",pts:P20,nat:"prove",lvl:"mid",top:["mono","flim"],
+ title:"גבול חד־צדדי משמאל של פונקציה מונוטונית יורדת",
+ st:"יהיו $a,b\\in\\mathbb{R}$ כך ש-$a<b$ ותהי $f$ פונקציה מונוטונית יורדת בקטע $(a,b)$. יהי $x_0\\in(a,b)$.\nהוכיחו שהגבול החד־צדדי $\\lim\\limits_{x\\to x_0^{-}}f(x)$ קיים (במובן הצר!) ומתקיים: $f(x_0)\\leqslant\\lim\\limits_{x\\to x_0^{-}}f(x)$.\nאסור להסתמך על הטענה המקבילה שהוכחה בהרצאה עבור פונקציה מונוטונית עולה."},
+{id:"25a1-4a",ex:"25a1",o:5,q:"4",s:"א",pts:PS,nat:"prove",lvl:"easy",top:["cont"],
+ title:"איטרציה של המשוואה הפונקציונלית לכל חזקה",
+ ctx:"תהי $f:(-1,1)\\to\\mathbb{R}$ פונקציה המקיימת $f(x)=f\\left(x^{2}\\right)$ לכל $x\\in(-1,1)$.",
+ st:"א) הוכיחו: $f(x)=f\\left(x^{2^{n}}\\right)$ לכל $n\\in\\mathbb{N}$ ולכל $x\\in(-1,1)$. (לדוגמה עבור $n=3$: $f(x)=f\\left(x^{8}\\right)$)"},
+{id:"25a1-4b",ex:"25a1",o:6,q:"4",s:"ב",pts:PS,nat:"prove",lvl:"hard",top:["cont"],
+ title:"רציפות באפס גוררת שהפונקציה קבועה",
+ ctx:"תהי $f:(-1,1)\\to\\mathbb{R}$ פונקציה המקיימת $f(x)=f\\left(x^{2}\\right)$ לכל $x\\in(-1,1)$.",
+ st:"ב) נתון גם ש-$f$ רציפה בנקודה $0$. הוכיחו ש-$f$ קבועה."},
+{id:"25a1-5a",ex:"25a1",o:7,q:"5",s:"א",pts:PS,nat:"prove",lvl:"mid",top:["deriv"],
+ title:"גזירות בכל הישר ומציאת פונקציית הנגזרת",
+ ctx:"יהי $2\\leqslant n$ מספר טבעי נתון ותהי $f:\\mathbb{R}\\to\\mathbb{R}$ המוגדרת על ידי\n$$f(x)=\\begin{cases}x^{n}\\cdot\\sin\\!\\left(\\tfrac{1}{x}\\right) & x\\neq 0\\\\[2pt] 0 & x=0\\end{cases}$$",
+ st:"א) הוכיחו ש-$f$ גזירה ב-$\\mathbb{R}$ ומצאו ביטוי מפורש לפונקציית הנגזרת $f':\\mathbb{R}\\to\\mathbb{R}$."},
+{id:"25a1-5b",ex:"25a1",o:8,q:"5",s:"ב",pts:PS,nat:"disprove",lvl:"hard",top:["deriv","cont"],
+ title:"האם פונקציית הנגזרת רציפה בכל הישר",
+ ctx:"יהי $2\\leqslant n$ מספר טבעי נתון ותהי $f:\\mathbb{R}\\to\\mathbb{R}$ המוגדרת על ידי\n$$f(x)=\\begin{cases}x^{n}\\cdot\\sin\\!\\left(\\tfrac{1}{x}\\right) & x\\neq 0\\\\[2pt] 0 & x=0\\end{cases}$$",
+ st:"ב) הוכיחו או הפריכו: אם $3\\leqslant n\\in\\mathbb{N}$ אזי פונקציית הנגזרת $f'$ רציפה ב-$\\mathbb{R}$."},
+
+/* ---------- 2025 סמסטר א׳ מועד ב׳ ---------- */
+{id:"25a2-1a",ex:"25a2",o:1,q:"1",s:"א",pts:PS,nat:"prove",lvl:"easy",top:["sup","sets"],
+ title:"חסימות מלרע של מכפלת שני קטעים",
+ ctx:"נתונות הקבוצות $A=(-1,2)=\\{x\\in\\mathbb{R}\\mid -1<x<2\\}$, $B=(-3,4)=\\{x\\in\\mathbb{R}\\mid -3<x<4\\}$.\nנגדיר $A\\cdot B=\\{a\\cdot b\\mid a\\in A,\\ b\\in B\\}$.",
+ st:"א) הוכיחו ש-$A\\cdot B$ חסומה מלרע."},
+{id:"25a2-1b",ex:"25a2",o:2,q:"1",s:"ב",pts:PS,nat:"compute",lvl:"mid",top:["sup","sets"],
+ title:"הערך המספרי של $\\inf(A\\cdot B)$",
+ ctx:"נתונות הקבוצות $A=(-1,2)=\\{x\\in\\mathbb{R}\\mid -1<x<2\\}$, $B=(-3,4)=\\{x\\in\\mathbb{R}\\mid -3<x<4\\}$.\nנגדיר $A\\cdot B=\\{a\\cdot b\\mid a\\in A,\\ b\\in B\\}$.",
+ st:"ב) מצאו את ערכו המספרי של $\\inf(A\\cdot B)$. הוכיחו את תשובתכם!"},
+{id:"25a2-2",ex:"25a2",o:3,q:"2",s:"",pts:P20,nat:"prove",lvl:"mid",top:["rec","seq"],
+ title:"התכנסות סדרה רקורסיבית עם שורש",
+ st:"תהי $(a_n)_{n=1}^{\\infty}$ הסדרה המוגדרת על ידי $a_1=3$ ו-$a_{n+1}=\\sqrt{12a_n-11}$ לכל $n\\in\\mathbb{N}$.\nהוכיחו שהסדרה $(a_n)_{n=1}^{\\infty}$ מתכנסת וחשבו את גבולה.\nמותר להשתמש בכל המשפטים שנלמדו בפרק על סדרות, אך צריך לצטט אותם."},
+{id:"25a2-3",ex:"25a2",o:4,q:"3",s:"",pts:P20,nat:"prove",lvl:"mid",top:["flim","seqdef"],
+ title:"גבול פונקציה בלשון אפסילון־דלתא",
+ st:"הוכיחו באמצעות הגדרת הגבול בלשון אפסילון־דלתא ש-$\\lim\\limits_{x\\to 2}\\dfrac{x^{2}+3x-9}{5x-9}=1$."},
+{id:"25a2-4",ex:"25a2",o:5,q:"4",s:"",pts:P20,nat:"theorem",lvl:"mid",top:["weier","cont"],
+ title:"המשפט הראשון של ויירשטראס",
+ st:"יהיו $a,b\\in\\mathbb{R}$ כך ש-$a<b$.\nהוכיחו את המשפט הראשון של ויירשטראס האומר שאם $f:[a,b]\\to\\mathbb{R}$ פונקציה רציפה, אזי $f$ חסומה בקטע $[a,b]$. כלומר, קיימים $m,M\\in\\mathbb{R}$ כך ש-$m\\leqslant f(x)\\leqslant M$ לכל $x\\in[a,b]$.\nאין צורך להוכיח את המשפטים והטענות שעליהם הסתמכה ההוכחה של המשפט הראשון של ויירשטראס בהרצאה, אך צריך לצטט אותם."},
+{id:"25a2-5a",ex:"25a2",o:6,q:"5",s:"א",pts:PS,nat:"prove",lvl:"mid",top:["deriv"],
+ title:"גזירות ומציאת הנגזרת של $x+mx^2\\sin(1/x)$",
+ ctx:"יהי $0<m\\in\\mathbb{R}$ ותהי $f:\\mathbb{R}\\to\\mathbb{R}$ המוגדרת על ידי\n$$f(x)=\\begin{cases}x+m\\,x^{2}\\cdot\\sin\\!\\left(\\tfrac{1}{x}\\right) & x\\neq 0\\\\[2pt] 0 & x=0\\end{cases}$$",
+ st:"א) הוכיחו ש-$f$ גזירה ב-$\\mathbb{R}$ ומצאו ביטוי מפורש לפונקציית הנגזרת $f':\\mathbb{R}\\to\\mathbb{R}$.\nמותר להשתמש בנגזרות של הפונקציות האלמנטריות ובכל חוקי הגזירה שנלמדו בהרצאה, אך צריך לצטט אותם."},
+{id:"25a2-5b",ex:"25a2",o:7,q:"5",s:"ב",pts:PS,nat:"prove",lvl:"mid",top:["deriv"],
+ title:"חסם תחתון לנגזרת",
+ ctx:"יהי $0<m\\in\\mathbb{R}$ ותהי $f:\\mathbb{R}\\to\\mathbb{R}$ המוגדרת על ידי\n$$f(x)=\\begin{cases}x+m\\,x^{2}\\cdot\\sin\\!\\left(\\tfrac{1}{x}\\right) & x\\neq 0\\\\[2pt] 0 & x=0\\end{cases}$$",
+ st:"ב) הסיקו מסעיף א׳ ש-$f'(x)\\geqslant 1-m+2mx\\cdot\\sin\\!\\left(\\tfrac{1}{x}\\right)$ עבור כל $x\\in\\mathbb{R}$."},
+{id:"25a2-5c",ex:"25a2",o:8,q:"5",s:"ג",pts:PS,nat:"disprove",lvl:"hard",top:["deriv","mono"],
+ title:"מונוטוניות בסביבת האפס כאשר $0<m<1$",
+ ctx:"יהי $0<m\\in\\mathbb{R}$ ותהי $f:\\mathbb{R}\\to\\mathbb{R}$ המוגדרת על ידי\n$$f(x)=\\begin{cases}x+m\\,x^{2}\\cdot\\sin\\!\\left(\\tfrac{1}{x}\\right) & x\\neq 0\\\\[2pt] 0 & x=0\\end{cases}$$",
+ st:"ג) הוכיחו או הפריכו: אם $0<m<1$, אז קיימת סביבה $U$ של $0$ כך ש-$f$ מונוטונית עולה ב-$U$."},
+
+/* ---------- 2025 סמסטר ב׳ מועד א׳ ---------- */
+{id:"25b1-1",ex:"25b1",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"mid",top:["sup","sets"],
+ title:"הסופרמום של מכפלת קבוצות חיוביות",
+ st:"תהיינה $A,B\\subseteq\\mathbb{R}^{+}$ קבוצות לא ריקות וחסומות (כאשר $\\mathbb{R}^{+}=\\{x\\in\\mathbb{R}\\mid x>0\\}$).\nנגדיר את הקבוצה $A\\cdot B=\\{a\\cdot b\\mid a\\in A,\\ b\\in B\\}$.\nהראו שמתקיים $\\sup(A\\cdot B)=\\sup(A)\\cdot\\sup(B)$."},
+{id:"25b1-2",ex:"25b1",o:2,q:"2",s:"",pts:P20,nat:"prove",lvl:"mid",top:["subseq"],
+ title:"גבול של גבולות חלקיים הוא גבול חלקי",
+ st:"תהיינה $(a_n)_{n=1}^{\\infty}$, $(b_n)_{n=1}^{\\infty}$ שתי סדרות, כך שכל איברי הסדרה $(b_n)_{n=1}^{\\infty}$ הם גבולות חלקיים של הסדרה $(a_n)_{n=1}^{\\infty}$.\nנניח שמתקיים $\\lim\\limits_{n\\to\\infty}b_n=L$ (כאשר $L\\in\\mathbb{R}$).\nהראו ש-$L$ הוא גבול חלקי של הסדרה $(a_n)_{n=1}^{\\infty}$."},
+{id:"25b1-3",ex:"25b1",o:3,q:"3",s:"",pts:P20,nat:"prove",lvl:"mid",top:["flim","cont"],
+ title:"הגבול באינסוף מתאפס",
+ st:"תהי $f:[0,\\infty)\\to\\mathbb{R}$ פונקציה רציפה וחיובית.\nנתון כי $\\lim\\limits_{x\\to\\infty}f(x)=L$ (כאשר $L\\in\\mathbb{R}$).\nנתון גם שלכל $\\varepsilon>0$ יש $x\\geq 0$ כך ש-$0<f(x)<\\varepsilon$.\nהוכיחו כי $L=0$."},
+{id:"25b1-4",ex:"25b1",o:4,q:"4",s:"",pts:P20,nat:"prove",lvl:"hard",top:["weier","cont"],
+ title:"קיצון בקטע חצי־פתוח כשהגבול קיים במובן הרחב",
+ st:"תהי $f:(0,1]\\to\\mathbb{R}$ פונקציה רציפה, כך שהגבול $\\lim\\limits_{x\\to 0^{+}}f(x)$ קיים במובן הרחב.\nהראו שיש ל-$f$ מקסימום או מינימום בקטע $(0,1]$."},
+{id:"25b1-5",ex:"25b1",o:5,q:"5",s:"",pts:P20,nat:"prove",lvl:"mid",top:["mvt","deriv"],
+ title:"נקודה שבה $f(c)\\cdot f'(c)=2$",
+ st:"תהי $f:[0,10]\\to\\mathbb{R}$ פונקציה רציפה, שגזירה ב-$(0,10)$.\nנניח כי $f(0)=3$, $f(10)=7$.\nהראו שיש $c\\in(0,10)$ כך שמתקיים $f(c)\\cdot f'(c)=2$."},
+
+/* ---------- 2025 סמסטר ב׳ מועד ב׳ ---------- */
+{id:"25b2-1",ex:"25b2",o:1,q:"1",s:"",pts:P20,nat:"prove",lvl:"hard",top:["sup"],
+ title:"סופרמום אי־רציונלי ואיברים שאינם שלמים",
+ st:"תהי $A\\subseteq\\mathbb{R}$ קבוצה חסומה ולא ריקה, כך ש-$\\sup(A)\\notin\\mathbb{Q}$.\nהראו שלכל $n\\in\\mathbb{N}$ יש $a\\in A$ כך ש-$a\\cdot n\\notin\\mathbb{Z}$."},
+{id:"25b2-2a",ex:"25b2",o:2,q:"2",s:"א",pts:PS,nat:"prove",lvl:"mid",top:["rec","seq"],
+ title:"סדרה רקורסיבית עם תנאי התחלה מתחת לנקודת השבת",
+ st:"א) יהי $0<\\alpha<3$, ונגדיר סדרה על ידי הכלל הרקורסיבי: $a_1=\\alpha$, $a_{n+1}=\\dfrac{a_n^{2}+12}{7}$.\nהראו שהסדרה $(a_n)_{n=1}^{\\infty}$ מתכנסת, וחשבו את גבולה."},
+{id:"25b2-2b",ex:"25b2",o:3,q:"2",s:"ב",pts:PS,nat:"prove",lvl:"hard",top:["rec","seq"],
+ title:"אותה רקורסיה עם תנאי התחלה בין 3 ל-4",
+ st:"ב) יהי $3<\\beta<4$, ונגדיר סדרה על ידי הכלל הרקורסיבי: $b_1=\\beta$, $b_{n+1}=\\dfrac{b_n^{2}+12}{7}$.\nהראו שהסדרה $(b_n)_{n=1}^{\\infty}$ מתכנסת, וחשבו את גבולה."},
+{id:"25b2-3",ex:"25b2",o:4,q:"3",s:"",pts:P20,nat:"prove",lvl:"mid",top:["flim","seq"],
+ title:"מאפיין היינה לקיום הגבול מימין",
+ st:"תהי $f:(0,\\infty)\\to\\mathbb{R}$ פונקציה, כך שלכל סדרה $(a_n)_{n=1}^{\\infty}$ של מספרים חיוביים ששואפת ל-$0$, הגבול $\\lim\\limits_{n\\to\\infty}f(a_n)$ קיים (במובן הצר).\nהראו כי הגבול $\\lim\\limits_{x\\to 0^{+}}f(x)$ קיים."},
+{id:"25b2-4",ex:"25b2",o:5,q:"4",s:"",pts:P20,nat:"prove",lvl:"mid",top:["ivt","cont"],
+ title:"נקודה שבה $f(c)=f(c+1)$",
+ st:"תהי $f:[0,2]\\to\\mathbb{R}$ פונקציה רציפה, המקיימת $f(0)=f(2)$.\nהראו שקיים $c\\in[0,1]$ כך שמתקיים $f(c)=f(c+1)$."},
+{id:"25b2-5",ex:"25b2",o:6,q:"5",s:"",pts:P20,nat:"prove",lvl:"hard",top:["mvt","deriv"],
+ title:"שוויון בין הנגזרות הלוגריתמיות",
+ st:"תהיינה $f,g:[2,5]\\to\\mathbb{R}^{+}$ פונקציות רציפות וחיוביות, שגזירות ב-$(2,5)$, כך שמתקיים $\\dfrac{f(2)}{g(2)}=\\dfrac{f(5)}{g(5)}$.\nהראו שיש $c\\in(2,5)$ כך ש-$\\dfrac{f'(c)}{f(c)}=\\dfrac{g'(c)}{g(c)}$."}
+];
+
+const COURSES=[{ no:"80131", name:"חשבון אינפיניטסימלי 1",
+  alias:["אינפי 1","אינפי1","infi 1","infi1","חדו״א 1","חדוא 1","calculus 1","חשבון אינפיניטסימלי"],
+  dept:"החוג למתמטיקה, האוניברסיטה העברית" }];
+
+let db=null, user=null, uid=null, canWrite=true;
+let stats={}, hints={}, mine={liked:[],solved:[]}, pagesBy={};
+const state={q:"",topic:"",nature:"",year:"",sem:"",moed:"",sort:"new",hide:false};
+
+(async () => {
+  const c=window.claude;
+  if(c&&c.use){
+    [db,user]=await Promise.all([c.use("db"),c.use("user")]);
+    if(user){ uid=await user.id(); const w=await user.can("data.write"); canWrite=(w!==false); }
+    if(db){
+      db.collection("stats").onSnapshot(s=>{ for(const d of s.docs) stats[d.id]=d.data()||{}; render(); },()=>{});
+      db.collection("hints").onSnapshot(s=>{ hints={}; for(const d of s.docs){ const h=d.data(); if(!h) continue;
+        (hints[h.qid]=hints[h.qid]||[]).push({id:d.id,...h}); } render(); },()=>{});
+      if(uid) db.doc("data/users/"+uid+"/profile").onSnapshot(d=>{ const v=d.data();
+        mine={liked:(v&&v.liked)||[],solved:(v&&v.solved)||[]}; render(); },()=>{});
+    }
+  }
+  render();
+})();
+
+const stat=id=>stats[id]||{likes:0,views:0,solves:0};
+async function bump(id,field,delta){
+  if(!db||!canWrite) return;
+  const s=stat(id), next={likes:s.likes||0,views:s.views||0,solves:s.solves||0};
+  next[field]=Math.max(0,(next[field]||0)+delta);
+  stats[id]=next;
+  try{ await db.doc("stats/"+id).set(next); }catch(e){ if(e&&e.code==="invalid_argument") canWrite=false; }
+}
+async function saveMine(){ if(!db||!uid) return; try{ await db.doc("data/users/"+uid+"/profile").set({liked:mine.liked,solved:mine.solved}); }catch(e){} }
+const has=(a,id)=>a.indexOf(id)>=0;
+function toggle(a,id){ const i=a.indexOf(id); if(i>=0){a.splice(i,1);return false;} a.push(id); return true; }
+
+function fill(sel,label,pairs){
+  sel.replaceChildren(); sel.append(new Option(label,""));
+  for(const [v,t] of pairs) sel.append(new Option(t,v));
+}
+const YEARS=[...new Set(Object.values(EXAMS).map(e=>e.y))].sort((a,b)=>b-a);
+fill($("fTopic"),"כל הנושאים",Object.entries(TOPIC));
+fill($("fNature"),"כל סוגי השאלות",Object.entries(NATURE));
+fill($("fYear"),"כל השנים",YEARS.map(y=>[String(y),String(y)]));
+fill($("fSem"),"כל הסמסטרים",[["א","סמסטר א׳"],["ב","סמסטר ב׳"]]);
+fill($("fMoed"),"כל המועדים",[["א","מועד א׳"],["ב","מועד ב׳"]]);
+for(const [v,t] of [["new","החדשות ביותר"],["old","הישנות ביותר"],["likes","הכי אהובות"],["views","הכי נצפות"],["solves","הכי הרבה סיימו"]])
+  $("fSort").append(new Option(t,v));
+
+function markActive(sel){ sel.closest(".field").classList.toggle("active",!!sel.value && sel.id!=="fSort"); }
+function bind(id,key){ const s=$(id); s.onchange=e=>{ state[key]=e.target.value; markActive(s); render(); }; }
+bind("fTopic","topic"); bind("fNature","nature"); bind("fYear","year"); bind("fSem","sem"); bind("fMoed","moed");
+$("fSort").onchange=e=>{state.sort=e.target.value;render();};
+function setQuery(v,from){
+  state.q=v.trim();
+  if(from!=="q") $("q").value=v;
+  if(from!=="q2") $("q2").value=v;
+  render();
+}
+$("q").oninput=e=>setQuery(e.target.value,"q");
+$("q2").oninput=e=>setQuery(e.target.value,"q2");
+$("q").onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault();
+  document.querySelector(".controls").scrollIntoView({behavior:"smooth",block:"start"}); } };
+
+/* the opening search hands over to the one in the masthead once it scrolls away */
+const mini=$("mini");
+if(window.IntersectionObserver)
+  new IntersectionObserver(es=>{ for(const e of es)
+    mini.classList.toggle("show",!e.isIntersecting && !$("app").hidden); },
+    {rootMargin:"-60px 0px 0px 0px"}).observe(document.querySelector(".controls"));
+
+/* the opening screen: find a course, then enter its bank */
+function courseStats(no){
+  const items=SEED.filter(x=>EXAMS[x.ex].c===no||!EXAMS[x.ex].c);
+  const exs=new Set(items.map(x=>x.ex));
+  const ys=[...new Set([...exs].map(k=>EXAMS[k].y))].sort();
+  return {n:items.length,exams:exs.size,from:ys[0],to:ys[ys.length-1]};
+}
+function matches(c,t){
+  if(!t) return true;
+  const hay=[c.no,c.name,...c.alias].join(" ").toLowerCase();
+  return hay.indexOf(t)>=0;
+}
+function renderCourses(){
+  const t=$("cq").value.trim().toLowerCase(), box=$("courseList");
+  box.replaceChildren();
+  const hits=COURSES.filter(c=>matches(c,t));
+  for(const c of hits){
+    const st=courseStats(c.no);
+    const b=el("button",{class:"course",type:"button"},
+      el("span",{class:"cno",textContent:c.no}),
+      el("span",{class:"ctitle",textContent:c.name}),
+      el("span",{class:"cline",textContent:c.dept}),
+      el("span",{class:"cline",textContent:st.n+" שאלות · "+st.exams+" מבחנים · "+st.from+"–"+st.to}),
+      el("span",{class:"cgo",textContent:"כניסה למאגר של הקורס ←"}));
+    b.onclick=()=>openCourse(c);
+    box.append(b);
+  }
+  if(!hits.length) box.append(el("p",{class:"none",textContent:
+    "לא נמצא קורס בשם או במספר הזה. במאגר יש כרגע קורס אחד: חשבון אינפיניטסימלי 1 (80131). "
+    +"אפשר להוסיף קורס נוסף על ידי צירוף שאלוני הבחינות שלו."}));
+}
+function openCourse(c){
+  const st=courseStats(c.no);
+  $("cName").textContent=c.name+" ("+c.no+")";
+  $("cMeta").textContent=st.n+" שאלות · "+st.exams+" מבחנים · "+st.from+"–"+st.to+" · רמזים בלבד";
+  $("hero").hidden=true; $("app").hidden=false;
+  render(); window.scrollTo({top:0});
+  $("q").focus({preventScroll:true});
+}
+function backToCourses(){
+  $("app").hidden=true; $("hero").hidden=false; mini.classList.remove("show");
+  $("cq").value=""; renderCourses(); window.scrollTo({top:0}); $("cq").focus({preventScroll:true});
+}
+$("cq").oninput=renderCourses;
+$("cq").onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault();
+  const hit=COURSES.filter(c=>matches(c,$("cq").value.trim().toLowerCase()))[0]; if(hit) openCourse(hit); } };
+$("changeCourse").onclick=backToCourses;
+renderCourses();
+$("fHide").onchange=e=>{state.hide=e.target.checked;render();};
+
+function visible(){
+  const t=state.q.toLowerCase();
+  const out=SEED.filter(x=>{
+    const E=EXAMS[x.ex];
+    if(state.topic&&!has(x.top,state.topic)) return false;
+    if(state.nature&&x.nat!==state.nature) return false;
+    if(state.year&&String(E.y)!==state.year) return false;
+    if(state.sem&&E.sem!==state.sem) return false;
+    if(state.moed&&E.moed!==state.moed) return false;
+    if(state.hide&&has(mine.solved,x.id)) return false;
+    if(t){ const hay=[x.title,x.st,x.ctx||"",NATURE[x.nat],...x.top.map(k=>TOPIC[k]),E.teach,
+      ...(hints[x.id]||[]).map(h=>h.text)].join(" ").toLowerCase();
+      if(hay.indexOf(t)<0) return false; }
+    return true;
+  });
+  const key={likes:"likes",views:"views",solves:"solves"}[state.sort];
+  if(key) out.sort((a,b)=>(stat(b.id)[key]||0)-(stat(a.id)[key]||0)||EXAMS[b.ex].n-EXAMS[a.ex].n||a.o-b.o);
+  else if(state.sort==="old") out.sort((a,b)=>EXAMS[a.ex].n-EXAMS[b.ex].n||a.o-b.o);
+  else out.sort((a,b)=>EXAMS[b.ex].n-EXAMS[a.ex].n||a.o-b.o);
+  return out;
+}
+
+function el(tag,props,...kids){
+  const n=document.createElement(tag);
+  for(const [k,v] of Object.entries(props||{})){ if(k==="class") n.className=v; else if(k in n) n[k]=v; else n.setAttribute(k,v); }
+  for(const k of kids) if(k!=null) n.append(k);
+  return n;
+}
+const typeset=n=>{ if(window.MathJax&&MathJax.typesetPromise) MathJax.typesetPromise(n).catch(()=>{}); };
+const pad=n=>String(n).padStart(2,"0");
+
+function card(x){
+  const E=EXAMS[x.ex], s=stat(x.id), liked=has(mine.liked,x.id), solved=has(mine.solved,x.id), hs=(hints[x.id]||[]).length;
+  const root=el("article",{class:"q"+(solved?" solved":"")});
+  root.append(el("div",{class:"num",textContent:x.q+(x.s||"")},el("i",{})));
+
+  const body=el("div"), lvl=LEVEL[x.lvl];
+  body.append(el("div",{class:"tags"},
+    el("span",{class:"chip",textContent:E.y+" · סמסטר "+E.sem+"׳ · מועד "+E.moed+"׳"}),
+    el("span",{class:"chip",textContent:NATURE[x.nat]}),
+    el("span",{class:"chip level "+lvl[1],textContent:lvl[0]}),
+    el("span",{class:"chip",textContent:x.pts}),
+    x.unc?el("span",{class:"chip warn",textContent:"בדקו מול הסריקה"}):null));
+  body.append(el("h2",{textContent:x.title}));
+  if(x.ctx) body.append(el("p",{class:"ctx",textContent:x.ctx}));
+  body.append(el("p",{class:"stmt",textContent:x.st}));
+
+  const bottom=el("div",{class:"bottom"});
+  bottom.append(el("div",{class:"topics"},...x.top.map(k=>el("span",{class:"chip topic",textContent:TOPIC[k]}))));
+  const acts=el("div",{class:"acts"});
+  const box=el("div",{class:"hints",hidden:true});
+  const hintBtn=el("button",{type:"button",class:"fire",textContent:hs?"רמזים ("+hs+")":"פתחו רמז ראשון"});
+  hintBtn.onclick=()=>{ box.hidden=!box.hidden; if(!box.hidden){ bump(x.id,"views",1); fillHints(box,x); } };
+  const done=el("button",{type:"button",class:solved?"on":"",textContent:solved?"סיימתי ✓":"סיימתי את השאלה"});
+  done.onclick=()=>{ const on=toggle(mine.solved,x.id); bump(x.id,"solves",on?1:-1); saveMine(); render(); };
+  const like=el("button",{type:"button",class:liked?"liked":"",textContent:(liked?"עזרה לי ✓ ":"עזרה לי ")+(s.likes||0)});
+  like.onclick=()=>{ const on=toggle(mine.liked,x.id); bump(x.id,"likes",on?1:-1); saveMine(); render(); };
+  const page=el("button",{type:"button",textContent:"דף המקור"});
+  page.onclick=()=>showPage(x);
+  acts.append(hintBtn,done,like,page);
+  bottom.append(acts);
+  body.append(bottom);
+  body.append(el("div",{class:"stat",style:"margin-top:8px"},
+    el("span",{textContent:(s.views||0)+" צפיות · "+(s.solves||0)+" סיימו · "+E.teach+" · "+E.file})));
+
+  root.append(body,box);
+  return root;
+}
+
+function fillHints(box,x){
+  box.replaceChildren();
+  const list=(hints[x.id]||[]).slice().sort((a,b)=>(b.votes||0)-(a.votes||0));
+  if(!list.length) box.append(el("p",{class:"note",textContent:"אין עדיין רמזים לשאלה הזאת. הרמז הראשון הוא שלכם — כיוון מחשבה, לא פתרון."}));
+  for(const h of list){
+    const d=el("div",{class:"hint"},el("div",{class:"htxt",textContent:h.text}));
+    const up=el("button",{type:"button",textContent:"עזר לי · "+(h.votes||0)});
+    up.onclick=async()=>{ if(!db||!canWrite) return; try{ await db.doc("hints/"+h.id).update({votes:(h.votes||0)+1}); }catch(e){} };
+    d.append(el("div",{class:"meta"},up,el("span",{textContent:"רמז של סטודנט/ית"})));
+    box.append(d);
+  }
+  const ta=el("textarea",{placeholder:"רמז — כיוון מחשבה, לא פתרון מלא. נוסחאות נכתבות ב־LaTeX בין סימני דולר, למשל $\\sup A-\\varepsilon$",ariaLabel:"כתיבת רמז"});
+  const send=el("button",{type:"button",class:"fire",textContent:"פרסום הרמז"});
+  const msg=el("span",{});
+  send.onclick=async()=>{
+    const text=ta.value.trim(); if(!text) return;
+    if(!db||!canWrite){ msg.textContent="אין הרשאת כתיבה בתצוגה הזאת."; return; }
+    send.disabled=true;
+    try{ await db.collection("hints").doc().set({qid:x.id,text,votes:0,at:new Date().toISOString()});
+         ta.value=""; msg.textContent="הרמז פורסם."; }
+    catch(e){ msg.textContent="הרמז לא נשמר ("+((e&&e.code)||"שגיאה")+")."; }
+    finally{ send.disabled=false; }
+  };
+  box.append(el("div",{class:"hintform"},ta,el("div",{class:"line"},send,msg)));
+  typeset([box]);
+}
+
+function render(){
+  const items=visible();
+  $("count").textContent=items.length+" שאלות";
+  const exs=new Set(items.map(x=>x.ex));
+  $("of").textContent="מתוך "+exs.size+" מבחנים · חשבון אינפיניטסימלי 1 (80131) · 2023–2025";
+  const list=$("list"); list.replaceChildren();
+  if(!items.length) list.append(el("div",{class:"empty",textContent:"לא נמצאו שאלות שמתאימות לסינון."}));
+  for(const x of items) list.append(card(x));
+  typeset([list]);
+}
+
+/* source pages: rendered in the browser from the user's own file */
+$("btnPdf").onclick=()=>$("pdf").click();
+$("pdf").onchange=async()=>{
+  const files=[...$("pdf").files]; if(!files.length) return;
+  if(!window.pdfjsLib){ $("pdfNote").textContent="מנוע קריאת ה־PDF לא נטען. רעננו את הדף."; return; }
+  pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  $("btnPdf").disabled=true;
+  let ok=0, unknown=[];
+  for(const f of files){
+    const key=Object.keys(EXAMS).find(k=>EXAMS[k].file===f.name);
+    if(!key){ unknown.push(f.name); continue; }
+    $("pdfNote").textContent="מרנדר את "+f.name+"…";
+    try{
+      const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+      const imgs=[];
+      for(let n=1;n<=doc.numPages;n++){
+        const p=await doc.getPage(n), base=p.getViewport({scale:1});
+        const vp=p.getViewport({scale:1500/base.width});
+        const cv=document.createElement("canvas"); cv.width=vp.width|0; cv.height=vp.height|0;
+        const g=cv.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,cv.width,cv.height);
+        await p.render({canvasContext:g,viewport:vp}).promise;
+        imgs.push(cv.toDataURL("image/jpeg",0.9));
+      }
+      pagesBy[key]=imgs; ok++;
+    }catch(e){ unknown.push(f.name); }
+  }
+  $("btnPdf").disabled=false; $("pdf").value="";
+  $("pdfNote").textContent=(ok?ok+" מבחנים מצורפים — ״דף המקור״ מציג עכשיו את הסריקה. ":"")
+    +(unknown.length?"לא זוהו: "+unknown.join(", ")+". שמות הקבצים צריכים להיות כמו 80131_2024_1_1_1.pdf.":"הקבצים נשארים על המחשב שלכם ואינם נשלחים לשום מקום.");
+};
+
+function dialog(title,node){ $("dlgTitle").textContent=title; $("dlgBody").replaceChildren(node); $("dlg").showModal(); }
+function showPage(x){
+  const E=EXAMS[x.ex], imgs=pagesBy[x.ex]||[], b=el("div");
+  if(!imgs.length) b.append(el("p",{class:"note",textContent:"נוסח השאלה כאן הועתק מהסריקה ונבדק מולה. כדי לראות את הדף הסרוק עצמו, צרפו את הקובץ "+E.file+" בכפתור ״צרפו מבחן למאגר״. הקובץ נשאר על המחשב שלכם."}));
+  else{ const i=Math.min(2,imgs.length)-1;
+    b.append(el("img",{src:imgs[i],alt:"עמוד השאלות של "+E.file}),
+      el("p",{class:"note",textContent:E.file+" · "+E.date+" · "+E.teach}));
+  }
+  dialog(x.title,b);
+}
+$("dlgClose").onclick=()=>$("dlg").close();
+
+const TEXTS={
+  about:`למה רמזים ולא פתרונות מלאים?
+פתרון מלא נותן תחושת הבנה בלי יכולת לשחזר. רמז מכריח אתכם לכתוב את הפתרון בעצמכם, וזה מה שנשאר לפני המבחן.
+
+מאיפה השאלות?
+מבחני חשבון אינפיניטסימלי 1 (80131) של האוניברסיטה העברית, מהשנים 2023 עד 2025 — שני סמסטרים ושני מועדים בכל שנה. הנוסח הועתק מהשאלונים הסרוקים.
+
+למה חיפוש לפי נושא ואופי?
+כי כשרוצים לתרגל נקודת חולשה ספציפית, מעבר ידני על עשרות קבצי PDF הוא בדיוק מה שגורם לוותר. כאן מסננים לפי נושא, לפי אופי השאלה, לפי שנה, סמסטר ומועד.
+
+מה עם זכויות יוצרים?
+השאלות נכתבו על ידי סגל הקורס והזכויות עליהן שמורות לאוניברסיטה העברית. האתר אינו מציג פתרונות מלאים ואינו מחליף את המקור.`,
+  how:`1. מחפשים
+חיפוש חופשי או סינון לפי נושא, אופי השאלה, שנה, סמסטר ומועד.
+
+2. מנסים לבד
+קוראים את השאלה ומנסים. הכפתור הכתום פותח רמז — רק אחרי שנתקעתם.
+
+3. מסמנים ״סיימתי״
+הסימון נשמר אליכם באופן פרטי, ואפשר להסתיר את מה שכבר פתרתם ולהתרכז במה שנשאר.
+
+4. מחזירים לקהילה
+כתבתם רמז טוב? פרסמו אותו. הוא יישאר כאן גם לסמסטר הבא, במקום להיעלם בקבוצת הוואטסאפ.`,
+  account:`אין צורך בהרשמה נפרדת: הכניסה היא דרך חשבון Claude שלכם.
+מה שסימנתם כ״עזרה לי״ ומה שסיימתם נשמר אליכם באופן פרטי — אף אחד אחר לא רואה את זה. הרמזים שתפרסמו משותפים לכולם.`
+};
+function textDialog(title,key){ return e=>{ if(e) e.preventDefault();
+  dialog(title,el("div",{style:"white-space:pre-wrap",textContent:TEXTS[key]})); }; }
+$("navAbout").onclick=textDialog("Q&A","about");
+$("navHow").onclick=textDialog("איך זה עובד","how");
+$("navHome").onclick=e=>{ e.preventDefault(); backToCourses(); };
+$("btnJoin").onclick=textDialog("הרשמה","account");
+$("btnLogin").onclick=textDialog("כניסה","account");
+
+render();
+})();
+</script>
+</body>
+</html>

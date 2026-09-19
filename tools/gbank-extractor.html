@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gbank extractor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Frank+Ruhl+Libre:wght@400;500;700&display=swap">
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']], processEscapes: true },
+  svg: { fontCache: 'global' },
+  startup: { typeset: false }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<style>
+:root {
+  --desk: #E6ECE8; --paper: #FFFFFF; --ink: #1B2430; --muted: #5C6B78;
+  --rule: #C9D3CD; --blue: #1F3A5F; --blue-soft: #DCE6F2;
+  --ok: #2E6B4A; --ok-soft: #DDEFE4; --stamp: #B3261E; --stamp-soft: #F8E1DF;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #141A1F; --paper: #1D252C; --ink: #E7ECEF; --muted: #9AA8B3;
+    --rule: #33404A; --blue: #8FB4E3; --blue-soft: #243447;
+    --ok: #7CC79C; --ok-soft: #1E3529; --stamp: #F08A82; --stamp-soft: #3A2220;
+  }
+}
+:root[data-theme="dark"] {
+  --desk: #141A1F; --paper: #1D252C; --ink: #E7ECEF; --muted: #9AA8B3;
+  --rule: #33404A; --blue: #8FB4E3; --blue-soft: #243447;
+  --ok: #7CC79C; --ok-soft: #1E3529; --stamp: #F08A82; --stamp-soft: #3A2220;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--desk); color: var(--ink);
+  font: 15px/1.45 Assistant, "Segoe UI", Arial, sans-serif;
+}
+button, select, input, textarea { font: inherit; color: inherit; }
+button {
+  border: 1px solid var(--rule); background: var(--paper); border-radius: 4px;
+  padding: 6px 12px; cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--blue); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--blue); color: var(--paper); border-color: var(--blue); font-weight: 600; }
+button.danger { color: var(--stamp); }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(0, 1.15fr); height: 100vh; }
+.rail { border-right: 1px solid var(--rule); display: flex; flex-direction: column; min-height: 0; }
+.rail header { padding: 16px 16px 12px; }
+.rail h1 { margin: 0; font: 700 22px/1.1 "Frank Ruhl Libre", serif; color: var(--blue); }
+.rail p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.drop {
+  margin: 0 16px 12px; padding: 14px; border: 1.5px dashed var(--rule); border-radius: 6px;
+  text-align: center; color: var(--muted); font-size: 13px; cursor: pointer; background: transparent; width: calc(100% - 32px);
+}
+.drop.over { border-color: var(--blue); background: var(--blue-soft); color: var(--ink); }
+.list { overflow-y: auto; flex: 1; padding: 0 8px 8px; }
+.exam {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px; width: 100%;
+  border: 0; border-radius: 4px; background: transparent; text-align: left; padding: 7px 8px;
+}
+.exam[aria-current="true"] { background: var(--paper); box-shadow: inset 3px 0 0 var(--blue); }
+.exam .when { font-weight: 600; }
+.exam .state { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.exam .state.done { color: var(--ok); }
+.exam .state.todo { color: var(--stamp); }
+.rail footer { border-top: 1px solid var(--rule); padding: 12px 16px; display: grid; gap: 8px; }
+.rail footer label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.pages { overflow-y: auto; padding: 16px; border-right: 1px solid var(--rule); }
+.pages img { display: block; max-width: 100%; margin: 0 auto 16px; background: #fff; box-shadow: 0 1px 0 var(--rule), 0 8px 24px -12px rgba(20,40,60,.35); }
+.empty { color: var(--muted); max-width: 46ch; margin: 18vh auto 0; text-align: center; }
+.empty strong { color: var(--ink); display: block; font: 500 19px "Frank Ruhl Libre", serif; margin-bottom: 6px; }
+
+.work { display: flex; flex-direction: column; min-height: 0; }
+.bar { padding: 12px 16px; border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bar .title { font-weight: 700; margin-right: auto; }
+.status { padding: 8px 16px; font-size: 13px; color: var(--muted); min-height: 36px; border-bottom: 1px solid var(--rule); }
+.status.err { color: var(--stamp); background: var(--stamp-soft); }
+.items { overflow-y: auto; flex: 1; padding: 16px; display: grid; gap: 12px; align-content: start; }
+
+.item { background: var(--paper); border: 1px solid var(--rule); border-left: 4px solid var(--stamp); border-radius: 4px; padding: 12px 14px; }
+.item.approved { border-left-color: var(--ok); }
+.item .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.item .label { font-weight: 700; color: var(--blue); }
+.item .flag { font-size: 12px; color: var(--stamp); background: var(--stamp-soft); padding: 1px 6px; border-radius: 3px; }
+.item select, .item input[type=text] { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 6px; font-size: 13px; }
+.item input.topics { flex: 1; min-width: 140px; }
+.he { direction: rtl; text-align: right; font: 400 17px/1.7 "Frank Ruhl Libre", "David", serif; white-space: pre-wrap; overflow-x: auto; }
+.he.ctx { color: var(--muted); font-size: 15px; border-bottom: 1px dotted var(--rule); margin-bottom: 6px; padding-bottom: 6px; }
+.he mjx-container { direction: ltr; }
+.item textarea { width: 100%; min-height: 130px; direction: rtl; border: 1px solid var(--rule); border-radius: 4px; padding: 8px; background: var(--desk); font: 14px/1.5 Consolas, "Courier New", monospace; }
+.item .foot { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.item .foot label { margin-right: auto; display: flex; gap: 6px; align-items: center; font-weight: 600; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  .rail, .pages { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .list { max-height: 30vh; } .pages { max-height: 60vh; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <header>
+      <h1>gbank extractor</h1>
+      <p>Turns exam PDFs into reviewed, searchable questions.</p>
+    </header>
+    <button class="drop" id="drop" type="button">Drop exam PDFs here, or click to choose</button>
+    <input id="file" type="file" accept="application/pdf" multiple hidden>
+    <div class="list" id="list"></div>
+    <footer>
+      <label>Model
+        <select id="tier"><option value="default">Balanced</option><option value="complex">Most capable (slower)</option></select>
+      </label>
+      <button id="extractAll" type="button">Extract all unextracted</button>
+      <button id="exportAll" type="button">Download all as JSON</button>
+    </footer>
+  </aside>
+
+  <section class="pages" id="pages" aria-label="Exam pages">
+    <div class="empty"><strong>No exam open</strong>Add PDFs named like 80131_2019_1_1_1.pdf. The year, semester and moed are read from the filename.</div>
+  </section>
+
+  <section class="work">
+    <div class="bar">
+      <span class="title" id="title">Questions</span>
+      <button class="primary" id="extract" type="button" disabled>Extract questions</button>
+      <button id="stop" type="button" hidden>Stop</button>
+      <button id="approveAll" type="button" disabled>Approve all</button>
+    </div>
+    <div class="status" id="status" role="status"></div>
+    <div class="items" id="items"></div>
+  </section>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const HEB = { "1": "א", "2": "ב", "3": "ג" };
+const NATURES = ["state_and_prove_theorem", "prove", "prove_or_disprove", "compute", "give_example",
+  "true_false", "multiple_choice", "define", "explain", "other"];
+const TOPICS = ["real_numbers_supremum", "sequences_limits", "subsequences_limsup", "cauchy_sequences", "series",
+  "function_limits", "continuity", "uniform_continuity", "weierstrass_ivt", "derivative", "mean_value_theorems",
+  "lhopital_taylor", "monotone_inverse_functions", "elementary_functions", "integration_legacy", "other"];
+
+const exams = new Map();      // key -> { key, meta, pages:[{blob,url}], items:[], extracted }
+let current = null, sample = null, db = null, downloads = null, limits = null, ctl = null, busy = false;
+
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/* ---------- capabilities ---------- */
+(async () => {
+  const c = window.claude;
+  if (!c || !c.use) { say("Open this page inside Claude to enable extraction and saving.", true); return; }
+  [sample, db, downloads] = await Promise.all([c.use("sample"), c.use("db"), c.use("downloads")]);
+  if (sample) limits = await sample.limits().catch(() => null);
+  if (!sample) say("Claude is not available in this view, so extraction is off. Review and export still work.", true);
+  else if (!limits || !limits.images) say("This view cannot send images to Claude, so extraction is off.", true);
+  if (db) await loadSaved();
+  refresh();
+})();
+
+async function loadSaved() {
+  try {
+    const snap = await db.collection("exams").get();
+    for (const d of snap.docs) {
+      const data = d.data(); if (!data) continue;
+      const e = exams.get(d.id) || { key: d.id, meta: data.meta || parseName(d.id + ".pdf"), pages: [] };
+      e.items = JSON.parse(JSON.stringify(data.items || []));
+      e.extracted = true;
+      exams.set(d.id, e);
+    }
+  } catch (err) { say("Saved exams could not be loaded (" + (err.code || "error") + ").", true); }
+}
+
+const saveTimers = new Map();   // one pending save per exam, so switching exams never drops a save
+function save(e) {
+  if (!db) return;
+  clearTimeout(saveTimers.get(e.key));
+  saveTimers.set(e.key, setTimeout(async () => {
+    try { await db.doc("exams/" + e.key).set({ meta: e.meta, items: e.items, updatedAt: new Date().toISOString() }); }
+    catch (err) { say("Changes to " + e.key + " were not saved (" + (err.code || "error") + "). Download the JSON to keep them.", true); }
+  }, 600));
+}
+
+/* ---------- files ---------- */
+function parseName(name) {
+  const m = /^(\d+)_(\d{4})_(\d)_(\d)_(\d)\.pdf$/i.exec(name);
+  if (!m) return { course: "", year: "", semester: "", moed: "", version: "", filename: name };
+  return { course: m[1], year: +m[2], semester: HEB[m[3]] || m[3], moed: HEB[m[4]] || m[4], version: +m[5], filename: name };
+}
+
+async function addFiles(files) {
+  const pdfs = [...files].filter(f => /\.pdf$/i.test(f.name));
+  if (!pdfs.length) { say("Those files are not PDFs.", true); return; }
+  if (!window.pdfjsLib) { say("The PDF reader did not load. Reload the page.", true); return; }
+  for (const [i, f] of pdfs.entries()) {
+    say("Rendering " + f.name + " (" + (i + 1) + " of " + pdfs.length + ")");
+    const key = f.name.replace(/\.pdf$/i, "").replace(/[^A-Za-z0-9_\-.~:@+]/g, "_");
+    const e = exams.get(key) || { key, meta: parseName(f.name), pages: [], items: [], extracted: false };
+    try { e.pages = await renderPdf(await f.arrayBuffer()); exams.set(key, e); if (!current) current = key; }
+    catch (err) { say(f.name + " could not be read as a PDF.", true); }
+    refresh();
+  }
+  say(pdfs.length + " PDF" + (pdfs.length > 1 ? "s" : "") + " ready.");
+}
+
+async function renderPdf(buf) {
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const out = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n);
+    const base = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: 1400 / base.width });
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+    const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);
+    await page.render({ canvasContext: g, viewport: vp }).promise;
+    const blob = await toBlob(cv);
+    // Two overlapping half-page crops keep small formulas legible after the platform downsizes images.
+    const h = Math.round(cv.height * 0.56);
+    const halves = [await crop(cv, 0, h), await crop(cv, cv.height - h, h)];
+    out.push({ blob, halves, url: URL.createObjectURL(blob) });
+  }
+  return out;
+}
+const toBlob = cv => new Promise(r => cv.toBlob(r, "image/jpeg", 0.9));
+function crop(src, y, h) {
+  const c = document.createElement("canvas"); c.width = src.width; c.height = h;
+  c.getContext("2d").drawImage(src, 0, y, src.width, h, 0, 0, src.width, h);
+  return toBlob(c);
+}
+
+/* ---------- extraction ---------- */
+function prompt(e, n, total, lastLabel) {
+  return [
+    "You are transcribing one page of a Hebrew university mathematics exam into structured data. Do not solve anything.",
+    "Exam: course " + e.meta.course + ", year " + e.meta.year + ", semester " + e.meta.semester + ", moed " + e.meta.moed + ". This is page " + n + " of " + total + ".",
+    "Images: the first is the full page. Any further images are overlapping enlargements of the top and bottom halves of the same page, for reading small formulas. Do not transcribe anything twice.",
+    lastLabel ? "The previous page ended with item " + lastLabel + ". If this page opens with the continuation of that item, emit it first with continues_previous true." : "",
+    "Skip entirely: exam instructions, cover text, answer-sheet forms (טופס נלווה), ID/notebook boxes, grading tables, page headers and footers, archive stamps, handwriting.",
+    "The atomic unit is the smallest independently answerable piece: a sub-part such as (א) or (ב) when the question has them, otherwise the whole question. Roman-numeral sub-items (i), (ii) stay inside their sub-part. Each true/false statement and each multiple-choice question is its own item.",
+    "Transcription rules: keep the Hebrew exactly as printed (fix nothing but obvious scan noise). Write ALL mathematics as LaTeX inside $...$ (or $$...$$ for displayed formulas), including single symbols like $f$ or $a_n$. Hebrew stays outside the dollar signs. If a symbol or word is unreadable, write [?] at that spot and set uncertain to true. Never guess a formula.",
+    "Reply with only one JSON object of this shape:",
+    '{"page_kind":"questions|instructions|answer_form|mixed|other","items":[{"part":"א|ב|ג or empty string","question":"question number as printed","subpart":"א|ב|... or empty string","continues_previous":false,"nature":"one of: ' + NATURES.join(", ") + '","points":null,"shared_context":"setup text that this item needs from the question stem, else empty string","statement":"the item text","choices":["for multiple_choice only, each choice with its letter"],"topics":["1-3 of: ' + TOPICS.join(", ") + '"],"uncertain":false}]}',
+    "nature guide: state_and_prove_theorem = asks to state and prove a named theorem from the course; prove_or_disprove = הוכיחו או הפריכו; give_example = תנו דוגמה; explain = asks to explain why a proof or argument works or fails. points is a number only when printed for that item.",
+    "If the page has no questions, return an empty items array."
+  ].filter(Boolean).join("\n\n");
+}
+
+const labelOf = it => [it.part && "פרק " + it.part, it.question && "שאלה " + it.question, it.subpart && "(" + it.subpart + ")"].filter(Boolean).join(" ");
+
+async function extractExam(e) {
+  if (!e.pages.length) { say("Add the PDF for " + e.key + " first. Saved questions are kept, but page images are not.", true); return false; }
+  const items = []; let last = "";
+  const max = limits.images.maxCount || 1;
+  for (let i = 0; i < e.pages.length; i++) {
+    say("Reading " + e.key + ", page " + (i + 1) + " of " + e.pages.length + ". This can take a minute per page.");
+    const p = e.pages[i];
+    const images = max >= 3 ? [p.blob, ...p.halves] : [p.blob];
+    const res = await sample.json(prompt(e, i + 1, e.pages.length, last), { images, modelTier: $("tier").value, signal: ctl.signal });
+    for (const raw of (res && Array.isArray(res.items) ? res.items : [])) {
+      const it = clean(raw, i + 1);
+      if (it.continues_previous && items.length) {
+        const prev = items[items.length - 1];
+        prev.statement = (prev.statement + "\n" + it.statement).trim();
+        prev.uncertain = prev.uncertain || it.uncertain;
+      } else items.push(it);
+    }
+    if (items.length) last = labelOf(items[items.length - 1]);
+  }
+  e.items = items.map((it, k) => ({ ...it, id: e.key + "#" + (k + 1) }));
+  e.extracted = true; save(e);
+  return true;
+}
+
+function clean(r, page) {
+  const s = v => (typeof v === "string" ? v : v == null ? "" : String(v)).trim();
+  return {
+    part: s(r.part), question: s(r.question), subpart: s(r.subpart),
+    continues_previous: r.continues_previous === true,
+    nature: NATURES.includes(r.nature) ? r.nature : "other",
+    points: Number.isFinite(+r.points) && r.points !== null && r.points !== "" ? +r.points : null,
+    shared_context: s(r.shared_context), statement: s(r.statement),
+    choices: Array.isArray(r.choices) ? r.choices.map(s).filter(Boolean) : [],
+    topics: Array.isArray(r.topics) ? r.topics.map(s).filter(Boolean) : [],
+    uncertain: r.uncertain === true || /\[\?\]/.test(s(r.statement)),
+    page, approved: false
+  };
+}
+
+const COPY = {
+  not_granted: "Extraction needs your permission to use Claude on this page. Reload to be asked again.",
+  rate_limited: "Claude usage limit reached. Finished exams are saved; continue later.",
+  session_expired: "Your session expired. Sign in again, then continue.",
+  invalid_json: "Claude's reply for that page was cut short or malformed. Try again, or switch the model.",
+  refused: "Claude declined that page. Nothing was changed.",
+  images_unavailable: "This view cannot send images to Claude.",
+  image_rejected: "A page image was rejected. Re-add the PDF and try again.",
+  upstream_error: "Connection problem while reading that page. Try again."
+};
+
+async function run(keys) {
+  if (busy || !sample || !limits || !limits.images) return;
+  busy = true; ctl = new AbortController(); refresh();
+  let done = 0;
+  try {
+    for (const k of keys) {
+      const e = exams.get(k); current = k; refresh();
+      if (await extractExam(e)) done++;
+      refresh();
+    }
+    say(done + " exam" + (done === 1 ? "" : "s") + " extracted. Review each item against the page, then approve.");
+  } catch (err) {
+    if (err && err.code === "cancelled") say("Stopped. " + done + " exam" + (done === 1 ? "" : "s") + " finished before stopping.");
+    else say(COPY[err && err.code] || COPY.upstream_error, true);
+  } finally { busy = false; ctl = null; refresh(); }
+}
+
+/* ---------- rendering ---------- */
+function say(msg, isErr) { const s = $("status"); s.textContent = msg; s.classList.toggle("err", !!isErr); }
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") n.className = v; else if (k in n) n[k] = v; else n.setAttribute(k, v);
+  }
+  for (const k of kids) n.append(k);
+  return n;
+}
+function typeset(nodes) {
+  if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise(nodes).catch(() => {});
+}
+
+function refresh() {
+  const list = $("list"); list.replaceChildren();
+  const sorted = [...exams.values()].sort((a, b) => a.key.localeCompare(b.key));
+  for (const e of sorted) {
+    const approved = e.items.filter(i => i.approved).length;
+    const state = !e.extracted ? ["not extracted", "todo"]
+      : approved === e.items.length && e.items.length ? ["reviewed", "done"]
+      : [approved + "/" + e.items.length + " approved", ""];
+    const name = e.meta.year ? e.meta.year + " " + e.meta.semester + "׳ מועד " + e.meta.moed : e.key;
+    const b = el("button", { class: "exam", type: "button" },
+      el("span", { class: "when", textContent: name }), el("span", { class: "state " + state[1], textContent: state[0] }));
+    if (e.key === current) b.setAttribute("aria-current", "true");
+    b.onclick = () => { if (!busy) { current = e.key; refresh(); } };
+    list.append(b);
+  }
+  const e = exams.get(current);
+  const canAsk = !!(sample && limits && limits.images);
+  $("extract").disabled = busy || !e || !e.pages.length || !canAsk;
+  $("extract").textContent = e && e.extracted ? "Extract again" : "Extract questions";
+  $("stop").hidden = !busy;
+  $("approveAll").disabled = busy || !e || !e.items.length;
+  $("extractAll").disabled = busy || !canAsk || !sorted.some(x => !x.extracted && x.pages.length);
+  $("exportAll").disabled = !sorted.some(x => x.items.length) || !downloads;
+  $("title").textContent = e ? e.key + (e.items.length ? " — " + e.items.length + " items" : "") : "Questions";
+
+  const pages = $("pages"); pages.replaceChildren();
+  if (!e) pages.append(el("div", { class: "empty" }, el("strong", { textContent: "No exam open" }),
+    "Add PDFs named like 80131_2019_1_1_1.pdf. The year, semester and moed are read from the filename."));
+  else if (!e.pages.length) pages.append(el("div", { class: "empty" }, el("strong", { textContent: "Questions saved, pages not loaded" }),
+    "Add " + e.meta.filename + " again to see its pages beside the questions."));
+  else e.pages.forEach((p, i) => pages.append(el("img", { src: p.url, alt: "Page " + (i + 1) + " of " + e.key, id: "pg" + (i + 1) })));
+
+  const box = $("items"); box.replaceChildren();
+  if (e && !e.items.length) box.append(el("div", { class: "empty" }, el("strong", { textContent: e.extracted ? "No questions found" : "Not extracted yet" }),
+    e.extracted ? "Claude found no questions in this file. Check the pages, then extract again." : "Extract questions to have Claude transcribe each page. You then check every item against the page."));
+  if (e) { e.items.forEach(it => box.append(card(e, it))); typeset([box]); }
+}
+
+function card(e, it) {
+  const root = el("article", { class: "item" + (it.approved ? " approved" : "") });
+  const head = el("div", { class: "head" }, el("span", { class: "label he", textContent: labelOf(it) || "פריט" }));
+  head.firstChild.style.cssText = "font-size:15px;line-height:1.2;white-space:nowrap";
+  if (it.uncertain) head.append(el("span", { class: "flag", textContent: "has unreadable spots" }));
+  const nat = el("select", { ariaLabel: "Question type" }, ...NATURES.map(n => el("option", { value: n, textContent: n.replace(/_/g, " ") })));
+  nat.value = it.nature; nat.onchange = () => { it.nature = nat.value; save(e); };
+  const top = el("input", { type: "text", class: "topics", value: it.topics.join(", "), ariaLabel: "Topics, comma separated" });
+  top.onchange = () => { it.topics = top.value.split(",").map(t => t.trim()).filter(Boolean); save(e); };
+  const pg = el("button", { type: "button", textContent: "p. " + it.page });
+  pg.onclick = () => { const t = $("pg" + it.page); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  head.append(nat, top, pg);
+
+  const view = el("div");
+  const paint = () => {
+    view.replaceChildren();
+    if (it.shared_context) view.append(el("div", { class: "he ctx", textContent: it.shared_context }));
+    view.append(el("div", { class: "he", textContent: it.statement + (it.choices.length ? "\n" + it.choices.join("\n") : "") }));
+    typeset([view]);
+  };
+  paint();
+
+  const edit = el("button", { type: "button", textContent: "Edit text" });
+  let area = null;
+  edit.onclick = () => {
+    if (area) {
+      it.statement = area.value.trim(); it.uncertain = /\[\?\]/.test(it.statement);
+      area.remove(); area = null; edit.textContent = "Edit text"; save(e); refresh(); return;
+    }
+    area = el("textarea", { value: it.statement, ariaLabel: "Statement source, Hebrew with LaTeX in dollar signs" });
+    view.after(area); edit.textContent = "Save text"; area.focus();
+  };
+  const ok = el("input", { type: "checkbox", checked: !!it.approved });
+  ok.onchange = () => { it.approved = ok.checked; save(e); refresh(); };
+  const del = el("button", { type: "button", class: "danger", textContent: "Remove" });
+  del.onclick = () => { e.items = e.items.filter(x => x !== it); save(e); refresh(); };
+  root.append(head, view, el("div", { class: "foot" }, el("label", null, ok, "Matches the page"), edit, del));
+  return root;
+}
+
+/* ---------- controls ---------- */
+const drop = $("drop"), file = $("file");
+drop.onclick = () => file.click();
+file.onchange = () => { addFiles(file.files); file.value = ""; };
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", ev => addFiles(ev.dataTransfer.files));
+window.addEventListener("dragover", ev => ev.preventDefault());
+window.addEventListener("drop", ev => ev.preventDefault());
+
+$("extract").onclick = () => current && run([current]);
+$("extractAll").onclick = () => run([...exams.values()].filter(e => !e.extracted && e.pages.length).map(e => e.key).sort());
+$("stop").onclick = () => ctl && ctl.abort();
+$("approveAll").onclick = () => { const e = exams.get(current); if (!e) return; e.items.forEach(i => i.approved = true); save(e); refresh(); };
+$("exportAll").onclick = async () => {
+  const data = [...exams.values()].filter(e => e.items.length).sort((a, b) => a.key.localeCompare(b.key))
+    .map(e => ({ exam: e.meta, items: e.items }));
+  try { await downloads.save({ filename: "gbank-questions.json", data: JSON.stringify(data, null, 2) }); say("Downloaded gbank-questions.json."); }
+  catch (err) { if (!err || err.code !== "declined") say("The download did not go through (" + ((err && err.code) || "error") + ").", true); }
+};
+refresh();
+})();
+</script>
+</body>
+</html>
