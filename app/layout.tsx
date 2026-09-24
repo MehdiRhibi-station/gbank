@@ -21,7 +21,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body suppressHydrationWarning>
         {children}
         <Script id="mathjax-config" strategy="beforeInteractive">
-          {`window.MathJax={tex:{inlineMath:[[\\"$\\",\\"$\\"]],displayMath:[[\\"$$\\",\\"$$\\"]]},svg:{fontCache:\\"global\\"},startup:{typeset:false}};`}
+          {`window.MathJax={tex:{inlineMath:[[\"$\",\"$\"]],displayMath:[[\"$$\",\"$$\"]]},svg:{fontCache:\"global\"},startup:{typeset:false}};`}
         </Script>
         <Script
           src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"
