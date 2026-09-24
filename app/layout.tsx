@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -18,10 +18,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Script id="mathjax-config" strategy="beforeInteractive">
-          {`window.MathJax={tex:{inlineMath:[[\"$\",\"$\"]],displayMath:[[\"$$\",\"$$\"]]},svg:{fontCache:\"global\"},startup:{typeset:false}};`}
+          {`window.MathJax={tex:{inlineMath:[[\\"$\\",\\"$\\"]],displayMath:[[\\"$$\\",\\"$$\\"]]},svg:{fontCache:\\"global\\"},startup:{typeset:false}};`}
         </Script>
         <Script
           src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"
