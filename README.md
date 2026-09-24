@@ -1,95 +1,148 @@
-# גיבנק — exam question bank
+# גיבנק
 
-A question bank for HUJI **חשבון אינפיניטסימלי 1 (80131)**: search exam questions
-by topic and by the kind of question, read hints instead of full solutions, and
-track what you've finished.
+בנק שאלות למבחני האוניברסיטה העברית: חיפוש לפי נושא ואופי השאלה, רמזים מהקהילה,
+שמירת התקדמות וצפייה בסריקות המקור. הפרויקט מגיע עם 93 שאלות מאינפי 1 ויכול לגדול
+לקורסים נוספים בלי לשנות את קוד הממשק.
 
-Live page: https://claude.ai/artifact/JhPciZzCMiw3UWGnyoKcqW
+## מה השתנה בגרסה הזאת
 
-## Files
+- ממשק Next.js מלא בעברית וב־RTL, בצבעי כחול כהה, כתום, שמנת ולבנדר.
+- Supabase עבור משתמשים, מסד נתונים, רמזים, לייקים, התקדמות וקובצי PDF.
+- מצב מקומי מובנה: האתר עובד מיד עם 93 השאלות גם לפני חיבור Supabase.
+- כלי ייבוא רב־קורסי שמעלה נתונים וקובצי PDF, ויכול להעביר או למחוק את קובצי המקור
+  רק לאחר שהייבוא כולו הצליח.
+- Row Level Security במסד הנתונים, וקובצי PDF ב־bucket פרטי עם קישורים זמניים.
+- בדיקת build אוטומטית ב־GitHub Actions.
 
+## הרצה מקומית
+
+דרישות: Node.js 22 ומעלה.
+
+```bash
+npm install
+npm run dev
 ```
-index.html              the whole site — markup, styles, data and logic in one file
-data/questions.json     the question bank on its own, for rebuilding the front end
-tools/gbank-extractor.html   PDF → structured questions, using Claude's vision, with a review screen
-tools/fetch_exams.py    downloads the exam PDFs from the HUJI exam bank
+
+פתחו [http://localhost:3000](http://localhost:3000). בלי קובץ `.env.local`, האתר פועל
+במצב מקומי: חיפוש, סינון, כל השאלות ושמירת התקדמות בדפדפן עובדים. התחברות, רמזים
+משותפים וסנכרון בין מכשירים דורשים Supabase.
+
+בדיקת הפרויקט לפני העלאה:
+
+```bash
+npm run check
 ```
 
-`index.html` needs no build step and no server — open it in a browser.
-`data/questions.json` is the same bank as plain data, so it is not trapped inside the
-page. `tools/gbank-extractor.html` predates the hand transcription of the 93 questions
-and is the path for bulk-loading another course. `tools/fetch_exams.py` needs
-`BASE_URL` and a session cookie filled in.
+## חיבור Supabase
 
-## Data
+1. צרו פרויקט חדש ב־Supabase.
+2. פתחו את SQL Editor והריצו את הקובץ
+   `supabase/migrations/202609210001_initial_gbank.sql`.
+3. העתיקו `.env.local.example` אל `.env.local` ומלאו את שלושת הערכים.
+4. ב־Supabase Auth הגדירו את כתובת האתר המקומית ואת כתובת Vercel כ־Redirect URLs.
+5. ייבאו את הקורס הראשון באמצעות הפקודה בסעיף הבא.
 
-93 questions from 12 exams (2023–2025, both semesters, both moadim). Each question:
+ה־`SUPABASE_SERVICE_ROLE_KEY` מיועד רק לכלי הייבוא המקומי. אסור להוסיף אותו ל־GitHub,
+ל־Vercel או למשתנה שמתחיל ב־`NEXT_PUBLIC_`.
+
+## הדרך החכמה להוסיף קורסים רבים
+
+שמרו לכל קורס תיקייה זמנית ב־Google Drive המקומי:
+
+```text
+GBank Imports/
+└── 80131/
+    ├── course-80131.json
+    ├── 80131_2025_1_1_1.pdf
+    └── 80131_2025_1_2_1.pdf
+```
+
+ראשית בצעו בדיקה שלא משנה דבר:
+
+```bash
+npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131" --dry-run
+```
+
+לאחר שבדקתם את הרשימה, ייבאו והשאירו את המקור ב־Drive:
+
+```bash
+npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131"
+```
+
+האפשרות הבטוחה ביותר לניקוי היא להעביר את הקבצים לארכיון לאחר הצלחה:
+
+```bash
+npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131" --archive-after-upload "C:/Google Drive/GBank Archive/80131"
+```
+
+אם אתם בטוחים שאינכם צריכים עותק נוסף, אפשר למחוק רק את קובצי ה־PDF שהועלו בהצלחה:
+
+```bash
+npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131" --delete-after-upload
+```
+
+הסקריפט לא מוחק דבר כברירת מחדל. אם העלאה או כתיבה למסד הנתונים נכשלת, שלב הניקוי
+לא מתבצע. אפשר להריץ את אותה פקודה שוב; הייבוא משתמש ב־upsert ולא יוצר כפילויות.
+
+## מבנה JSON לקורס
+
+הקובץ `data/course-80131.json` הוא דוגמה מלאה. המבנה הראשי הוא:
 
 ```json
 {
-  "id": "25a1-1",          // unique
-  "ex": "25a1",            // key into "exams"
-  "o": 1,                  // order within the exam
-  "q": "1", "s": "",       // question number, sub-part (א / ב / ג, empty if none)
-  "pts": "20 נק׳",
-  "nat": "prove",          // key into "natures"
-  "lvl": "mid",            // easy | mid | hard — my estimate, not measured
-  "top": ["sup", "seq"],   // keys into "topics"
-  "title": "…",
-  "ctx": "…",              // shared stem, present only when sub-parts share one
-  "st": "…",               // the question as printed
-  "unc": true              // present only where the scan was unclear
+  "course": {
+    "number": "80131",
+    "name": "חשבון אינפיניטסימלי 1",
+    "aliases": ["אינפי 1", "חדו״א 1"],
+    "department": "החוג למתמטיקה, האוניברסיטה העברית"
+  },
+  "exams": {},
+  "topics": {},
+  "natures": {},
+  "questions": []
 }
 ```
 
-Hebrew is plain text; mathematics is LaTeX between `$…$` (or `$$…$$` when displayed),
-rendered by MathJax. Sub-parts are separate entries because they are answered
-independently — the 2025 paper says so explicitly.
+כל שאלה מפנה למפתח מבחן בעזרת `ex`. כלי הייבוא מוסיף אוטומטית את מספר הקורס
+למזהים במסד הנתונים, ולכן אפשר להשתמש במזהים קצרים דומים בקורסים שונים.
 
-One entry carries `unc`: question 3 of 2023 semester ב moed ב, where the second
-branch of the case definition is smudged on the scan. The card shows a
-"בדקו מול הסריקה" chip for it.
+## העלאה ל־GitHub בלי `gh`
 
-## Running it
+צרו repository פרטי בשם `gbank` באתר GitHub, בלי README אוטומטי, ואז מתוך תיקיית הפרויקט:
 
-Two things behave differently
-depending on where it runs:
+```bash
+git init
+git add .
+git commit -m "Build GBank full-stack question bank"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/gbank.git
+git push -u origin main
+```
 
-- **Shared state** (hints, view counts, how many people finished each question) and
-  **private state** (what you liked and finished) use the `db` and `user` runtime
-  capabilities, available when the page is published as a Claude artifact. Opened as
-  a plain local file it still works — search, filters, all 93 questions, source
-  pages — but nothing persists and hints can't be posted.
-- **דף המקור** renders the exam PDFs with pdf.js in your browser. Attach them with
-  צרפו מבחן למאגר; files are matched by name (`80131_2025_1_1_1.pdf`) and never
-  leave your machine.
+אין צורך להתקין את GitHub CLI. פקודת `git` הרגילה מספיקה.
 
-External dependencies, loaded from cdnjs: MathJax 3.2.2 and pdf.js 3.11.174. Heebo
-comes from Google Fonts.
+## העלאה ל־Vercel
 
-## Adding exams
+1. ב־Vercel בחרו **Add New → Project** וחברו את repository `gbank`.
+2. הוסיפו רק `NEXT_PUBLIC_SUPABASE_URL` ו־`NEXT_PUBLIC_SUPABASE_ANON_KEY` ב־Environment Variables.
+3. בצעו Deploy.
+4. הוסיפו את כתובת Vercel ל־Redirect URLs של Supabase Auth.
 
-1. Add an entry to `EXAMS` in `index.html` — chronological index `n`, year,
-   semester, moed, date, teaching staff, filename, and how many questions had to be
-   answered.
-2. Add the questions to `SEED` in the shape above, and re-export `data/questions.json`.
+כל push חדש ל־`main` יוצר deploy חדש. מפתח ה־service role נשאר רק במחשב שמבצע את הייבוא.
 
-Both live near the top of the `<script>` block. The filters, the counts on the course
-card, and the suggested topics all derive from the data, so nothing else needs
-touching.
+## מבנה הפרויקט
 
-`tools/gbank-extractor.html` can do step 2 automatically for a new course: it renders each
-page, sends it to Claude as an image, and returns structured items for you to approve
-one by one. It never guesses a formula — unreadable spots come back as `[?]` and get
-flagged. Transcription quality drops on older scans, so check each item against the
-page before trusting it.
+```text
+app/                    Next.js pages and visual design
+components/             Search, filters, cards, hints and authentication UI
+data/course-80131.json  Built-in fallback data
+lib/                    Data adapters, browser database client and local state
+scripts/import-course.mjs
+supabase/migrations/    Database schema, policies and RPC functions
+legacy/                 The original one-file prototype and extraction tools
+```
 
-## Contributing hints
+## זכויות יוצרים
 
-Hints are the point of the site: a hint should give a direction, never a full solution.
-They are written from the page itself, not in this repo.
-
-## Copyright
-
-The questions were written by the course staff and the rights belong to the Hebrew
-University. The site shows no full solutions.
+השאלות נכתבו בידי סגלי הקורסים והזכויות עליהן שמורות לאוניברסיטה העברית. לפני
+פרסום רחב של סריקות מלאות, ודאו שקיבלתם הרשאה מתאימה. גיבנק מציג רמזים ולא פתרונות מלאים.

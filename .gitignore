@@ -1,14 +1,11 @@
-# Exam PDFs — the rights belong to the Hebrew University; keep them out of the repo
-*.pdf
-exams/
-manifest.csv
-
-# Local scratch
-.DS_Store
-Thumbs.db
-__pycache__/
-*.pyc
-.venv/
-venv/
 node_modules/
+.next/
+out/
 .env
+.env.local
+.env.*.local
+*.log
+*.tsbuildinfo
+.DS_Store
+imports/
+downloads/
