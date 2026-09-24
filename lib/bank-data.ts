@@ -1,21 +1,15 @@
-import seedJson from "@/data/course-80131.json";
+import infiSeedJson from "@/data/course-80131.json";
+import probabilitySeedJson from "@/data/course-80420.json";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { BankData, Course, Exam, LegacySeed, Question } from "@/lib/types";
 
-const seed = seedJson as LegacySeed;
+const seeds = [infiSeedJson, probabilitySeedJson] as LegacySeed[];
 
-export function getSeedBankData(): BankData {
+function seedToBankData(seed: LegacySeed): BankData {
   const course: Course = {
     number: seed.course.number,
     name: seed.course.name,
-    aliases: seed.course.aliases ?? [
-      "אינפי 1",
-      "אינפי1",
-      "חדו״א 1",
-      "חדוא 1",
-      "infi 1",
-      "calculus 1",
-    ],
+    aliases: seed.course.aliases ?? [],
     department: seed.course.department ?? "החוג למתמטיקה, האוניברסיטה העברית",
     topics: seed.topics,
     natures: seed.natures,
@@ -57,6 +51,15 @@ export function getSeedBankData(): BankData {
   }));
 
   return { courses: [course], exams, questions };
+}
+
+export function getSeedBankData(): BankData {
+  const banks = seeds.map(seedToBankData);
+  return {
+    courses: banks.flatMap((bank) => bank.courses),
+    exams: Object.assign({}, ...banks.map((bank) => bank.exams)),
+    questions: banks.flatMap((bank) => bank.questions),
+  };
 }
 
 export async function loadRemoteBankData(): Promise<BankData | null> {

@@ -410,6 +410,11 @@ export function BankApp() {
       }
       popup?.close();
     }
+    if (/^\d+_\d{4}_[123]_[123]_\d+\.pdf$/.test(exam.sourceFilename)) {
+      const sourceUrl = `https://www4.huji.ac.il/exams/${encodeURIComponent(exam.sourceFilename)}`;
+      window.open(sourceUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
     setToast(`כדי לראות את הסריקה, טענו את הקובץ ${exam.sourceFilename} מהמחשב.`);
   }
 

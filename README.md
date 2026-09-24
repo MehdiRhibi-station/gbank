@@ -1,14 +1,14 @@
 # גיבנק
 
 בנק שאלות למבחני האוניברסיטה העברית: חיפוש לפי נושא ואופי השאלה, רמזים מהקהילה,
-שמירת התקדמות וצפייה בסריקות המקור. הפרויקט מגיע עם 93 שאלות מאינפי 1 ויכול לגדול
-לקורסים נוספים בלי לשנות את קוד הממשק.
+שמירת התקדמות וצפייה בסריקות המקור. הפרויקט מגיע עם 117 שאלות מ-18 מבחנים בשני
+קורסים: אינפי 1 ותורת ההסתברות 1.
 
 ## מה השתנה בגרסה הזאת
 
 - ממשק Next.js מלא בעברית וב־RTL, בצבעי כחול כהה, כתום, שמנת ולבנדר.
 - Supabase עבור משתמשים, מסד נתונים, רמזים, לייקים, התקדמות וקובצי PDF.
-- מצב מקומי מובנה: האתר עובד מיד עם 93 השאלות גם לפני חיבור Supabase.
+- מצב מקומי מובנה: האתר עובד מיד עם 117 השאלות גם לפני חיבור Supabase.
 - כלי ייבוא רב־קורסי שמעלה נתונים וקובצי PDF, ויכול להעביר או למחוק את קובצי המקור
   רק לאחר שהייבוא כולו הצליח.
 - Row Level Security במסד הנתונים, וקובצי PDF ב־bucket פרטי עם קישורים זמניים.
@@ -135,7 +135,7 @@ git push -u origin main
 ```text
 app/                    Next.js pages and visual design
 components/             Search, filters, cards, hints and authentication UI
-data/course-80131.json  Built-in fallback data
+data/                   Built-in fallback data for courses 80131 and 80420
 lib/                    Data adapters, browser database client and local state
 scripts/import-course.mjs
 supabase/migrations/    Database schema, policies and RPC functions
