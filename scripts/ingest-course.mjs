@@ -16,6 +16,8 @@ import { createInterface } from "node:readline/promises";
 const HUJI_SEARCH_URL = "https://www4.huji.ac.il/htbin/exams/exams.cgi";
 const DEFAULT_FROM_YEAR = 2016;
 const DEFAULT_MODEL = "gpt-6-sol";
+const DEFAULT_LOCAL_MODEL = "qwen3-vl:8b";
+const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
 const MAX_PDF_BYTES = 50 * 1024 * 1024;
 
 const NATURE_LABELS = {
@@ -41,6 +43,7 @@ function usage() {
     "  npm run ingest:course -- 80420 --from 2016 --to 2026",
     "  npm run ingest:course -- 80420 --download-only",
     "  npm run ingest:course -- 80420 --draft-only",
+    "  npm run ingest:local",
     "",
     "Options:",
     "  --all                         Download all listed exams in the year range",
@@ -50,6 +53,10 @@ function usage() {
     "  --course-name NAME            Override the course name",
     "  --output-dir PATH             Work folder (default: imports/COURSE_NUMBER)",
     "  --model MODEL                 OpenAI extraction model",
+    "  --local                       Extract with a local Ollama model (no AI API key)",
+    "  --local-model MODEL           Ollama vision model (default: qwen3-vl:8b)",
+    "  --ollama-url URL              Local Ollama server URL",
+    "  --drive-dir PATH              Save the course under PATH/COURSE_NUMBER",
     "  --force-extract               Re-extract even when cached questions exist",
     "  --download-only               Download PDFs and stop",
     "  --draft-only                  Build the JSON draft but do not import it",
@@ -58,9 +65,9 @@ function usage() {
     "  --delete-after-upload         Delete PDFs after a successful import",
     "  --help                        Show this help",
     "",
-    "This is an owner-only command-line tool. It is not an API route and is never",
-    "available to website visitors. Keep OPENAI_API_KEY and",
-    "SUPABASE_SERVICE_ROLE_KEY only in your local .env.local file.",
+    "Local mode needs Ollama, but no OpenAI key. It renders the PDFs locally and",
+    "uses a vision model running on this computer. Database upload still requires",
+    "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
     "",
   ].join("\n"));
 }
@@ -75,6 +82,7 @@ function parseArgs(argv) {
     "draft-only",
     "yes",
     "delete-after-upload",
+    "local",
     "help",
   ]);
   const valueOptions = new Set([
@@ -83,6 +91,9 @@ function parseArgs(argv) {
     "course-name",
     "output-dir",
     "model",
+    "local-model",
+    "ollama-url",
+    "drive-dir",
     "archive-after-upload",
   ]);
 
@@ -519,6 +530,193 @@ async function extractPdf(pdfPath, exam, courseNumber, apiKey, model) {
   return result;
 }
 
+function parseJsonResponse(value, label) {
+  const raw = String(value ?? "").trim();
+  const unwrapped = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  try {
+    return JSON.parse(unwrapped);
+  } catch {
+    throw new Error(label + " returned invalid JSON.");
+  }
+}
+
+function getLocalOllamaUrl(value) {
+  let url;
+  try {
+    url = new URL(value || DEFAULT_OLLAMA_URL);
+  } catch {
+    throw new Error("OLLAMA_URL must be a valid local URL.");
+  }
+  const localHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  if (url.protocol !== "http:" || !localHosts.has(url.hostname)) {
+    throw new Error(
+      "Local extraction only accepts Ollama on localhost (for example " +
+        DEFAULT_OLLAMA_URL +
+        ").",
+    );
+  }
+  return url;
+}
+
+function ollamaEndpoint(baseUrl, pathname) {
+  return new URL(pathname, baseUrl).href;
+}
+
+async function ollamaModels(baseUrl) {
+  let response;
+  try {
+    response = await fetchWithTimeout(ollamaEndpoint(baseUrl, "/api/tags"), {}, 10000);
+  } catch {
+    throw new Error(
+      "Ollama is not running. Install and open Ollama, then run this command again: " +
+        "https://ollama.com/download/windows",
+    );
+  }
+  if (!response.ok) throw new Error("Ollama returned HTTP " + response.status + ".");
+  const payload = await response.json();
+  return payload.models ?? [];
+}
+
+function hasOllamaModel(models, requested) {
+  const candidates = new Set(
+    models.flatMap((model) => [model.name, model.model]).filter(Boolean),
+  );
+  return candidates.has(requested) || candidates.has(requested + ":latest");
+}
+
+async function pullOllamaModel(model) {
+  console.log("Downloading local model " + model + ". This is a one-time large download...");
+  await new Promise((resolve, reject) => {
+    const child = spawn("ollama", ["pull", model], { stdio: "inherit" });
+    child.on("error", () => {
+      reject(
+        new Error(
+          "Could not start Ollama. Install it from https://ollama.com/download/windows",
+        ),
+      );
+    });
+    child.on("exit", (code, signal) => {
+      if (code === 0) resolve();
+      else reject(new Error("Ollama model download exited with " + (signal || "code " + code)));
+    });
+  });
+}
+
+async function ensureLocalModel(baseUrl, model, assumeYes) {
+  let models = await ollamaModels(baseUrl);
+  if (!hasOllamaModel(models, model)) {
+    const approved = await confirm(
+      "Download the local vision model " + model + " now? The default model is about 6 GB",
+      assumeYes,
+    );
+    if (!approved) {
+      throw new Error("Local model is missing. Run: ollama pull " + model);
+    }
+    await pullOllamaModel(model);
+    models = await ollamaModels(baseUrl);
+  }
+  if (!hasOllamaModel(models, model)) {
+    throw new Error("Ollama model is still unavailable: " + model);
+  }
+
+  const response = await fetchWithTimeout(
+    ollamaEndpoint(baseUrl, "/api/show"),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model }),
+    },
+    30000,
+  );
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error("Could not inspect local model " + model + ": " + (payload.error || response.status));
+  }
+  if (Array.isArray(payload.capabilities) && !payload.capabilities.includes("vision")) {
+    throw new Error(model + " is not a vision model. Use qwen3-vl:8b or another local vision model.");
+  }
+}
+
+async function renderPdfPages(pdfPath) {
+  let pdf;
+  try {
+    ({ pdf } = await import("pdf-to-img"));
+  } catch {
+    throw new Error("PDF renderer is missing. Run npm install, then try again.");
+  }
+
+  const document = await pdf(pdfPath, { scale: 2, format: "jpeg" });
+  const images = [];
+  try {
+    for await (const page of document) {
+      images.push(Buffer.from(page).toString("base64"));
+    }
+  } finally {
+    await document.destroy();
+  }
+  if (!images.length) throw new Error("No pages could be rendered from " + path.basename(pdfPath));
+  return images;
+}
+
+async function extractPdfLocally(pdfPath, exam, courseNumber, baseUrl, model) {
+  const images = await renderPdfPages(pdfPath);
+  const schema = extractionSchema();
+  const response = await fetchWithTimeout(
+    ollamaEndpoint(baseUrl, "/api/chat"),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        think: false,
+        keep_alive: "30m",
+        format: schema,
+        options: {
+          temperature: 0,
+          num_ctx: Number.parseInt(process.env.OLLAMA_CONTEXT_LENGTH || "32768", 10),
+        },
+        messages: [
+          {
+            role: "system",
+            content:
+              extractionInstructions(courseNumber, exam.filename) +
+              "\nReturn JSON that exactly matches this schema: " +
+              JSON.stringify(schema),
+          },
+          {
+            role: "user",
+            content:
+              "These images are every page of the exam, in order. Transcribe the exam into the required structure.",
+            images,
+          },
+        ],
+      }),
+    },
+    60 * 60 * 1000,
+  );
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      "Local extraction failed for " +
+        exam.filename +
+        ": " +
+        (payload.error || "HTTP " + response.status),
+    );
+  }
+  const result = parseJsonResponse(
+    payload?.message?.content,
+    "Local extraction for " + exam.filename,
+  );
+  if (!Array.isArray(result.questions)) {
+    throw new Error("Local extraction for " + exam.filename + " has no questions array.");
+  }
+  return result;
+}
+
 function examInfoFromStored(exam) {
   const filename = String(exam.file || "");
   const match = filename.match(/_(\d{4})_(\d+)_(\d+)_(\d+)\.pdf$/i);
@@ -848,9 +1046,23 @@ async function main() {
   const toYear = parseYear(args.to ?? currentYear, "--to");
   if (fromYear > toYear) throw new Error("--from cannot be later than --to.");
 
+  if (args["output-dir"] && args["drive-dir"]) {
+    throw new Error("Choose either --output-dir or --drive-dir, not both.");
+  }
+  let driveDirectory = args["drive-dir"] || process.env.GBANK_DRIVE_DIR || "";
+  if (args.local && !args["output-dir"] && !driveDirectory && process.stdin.isTTY) {
+    driveDirectory = await ask(
+      "Google Drive imports folder (for example G:\\My Drive\\GBank Imports): ",
+    );
+  }
+  const requestedOutput = args["output-dir"]
+    ? args["output-dir"]
+    : driveDirectory
+      ? path.join(driveDirectory, courseNumber)
+      : path.join("imports", courseNumber);
   const outputDirectory = path.resolve(
     projectRoot,
-    args["output-dir"] ?? path.join("imports", courseNumber),
+    requestedOutput,
   );
   const cacheDirectory = path.join(outputDirectory, "extraction-cache");
   await mkdir(outputDirectory, { recursive: true });
@@ -933,27 +1145,56 @@ async function main() {
   }
 
   if (needsExtraction.length) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!isRealSecret(apiKey)) {
-      throw new Error(
-        needsExtraction.length +
-          " PDF(s) need extraction. Add OPENAI_API_KEY to .env.local, then run this command again. Downloaded files were kept.",
+    let model;
+    let provider;
+    let extract;
+
+    if (args.local) {
+      model = args["local-model"] || process.env.OLLAMA_MODEL || DEFAULT_LOCAL_MODEL;
+      const baseUrl = getLocalOllamaUrl(
+        args["ollama-url"] || process.env.OLLAMA_URL || DEFAULT_OLLAMA_URL,
       );
-    }
-    const approved = await confirm(
-      "Extract questions from " +
-        needsExtraction.length +
-        " PDF(s) with the OpenAI API? This uses your API account",
-      args.yes,
-    );
-    if (!approved) {
-      console.log("Stopped before AI extraction. Downloaded PDFs were kept.");
-      return;
+      await ensureLocalModel(baseUrl, model, args.yes);
+      const approved = await confirm(
+        "Extract questions from " +
+          needsExtraction.length +
+          " PDF(s) with local Ollama? This is free but can take several hours",
+        args.yes,
+      );
+      if (!approved) {
+        console.log("Stopped before local extraction. Downloaded PDFs were kept.");
+        return;
+      }
+      provider = "ollama-local";
+      extract = (pdfPath, exam) =>
+        extractPdfLocally(pdfPath, exam, courseNumber, baseUrl, model);
+    } else {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!isRealSecret(apiKey)) {
+        throw new Error(
+          needsExtraction.length +
+            " PDF(s) need extraction. Add OPENAI_API_KEY to .env.local, or use npm run ingest:local. Downloaded files were kept.",
+        );
+      }
+      const approved = await confirm(
+        "Extract questions from " +
+          needsExtraction.length +
+          " PDF(s) with the OpenAI API? This uses your API account",
+        args.yes,
+      );
+      if (!approved) {
+        console.log("Stopped before AI extraction. Downloaded PDFs were kept.");
+        return;
+      }
+      model = args.model || process.env.OPENAI_EXTRACT_MODEL || DEFAULT_MODEL;
+      provider = "openai";
+      extract = (pdfPath, exam) =>
+        extractPdf(pdfPath, exam, courseNumber, apiKey, model);
     }
 
-    const model =
-      args.model || process.env.OPENAI_EXTRACT_MODEL || DEFAULT_MODEL;
-    console.log("Extracting questions with " + model + "...");
+    console.log(
+      "Extracting questions with " + model + (args.local ? " on this computer" : "") + "...",
+    );
     for (let index = 0; index < needsExtraction.length; index += 1) {
       const exam = needsExtraction[index];
       console.log(
@@ -964,19 +1205,14 @@ async function main() {
           "] " +
           exam.filename,
       );
-      const result = await extractPdf(
-        pdfPaths.get(exam.filename),
-        exam,
-        courseNumber,
-        apiKey,
-        model,
-      );
+      const result = await extract(pdfPaths.get(exam.filename), exam);
       extractions.set(exam.filename, result);
       await writeJsonAtomic(
         path.join(cacheDirectory, exam.filename + ".json"),
         {
           filename: exam.filename,
           model,
+          provider,
           extractedAt: new Date().toISOString(),
           result,
         },
