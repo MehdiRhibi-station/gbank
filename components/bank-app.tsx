@@ -26,6 +26,7 @@ interface Filters {
   query: string;
   topic: string;
   nature: string;
+  instructor: string;
   year: string;
   semester: string;
   moed: string;
@@ -37,6 +38,7 @@ const initialFilters: Filters = {
   query: "",
   topic: "",
   nature: "",
+  instructor: "",
   year: "",
   semester: "",
   moed: "",
@@ -57,7 +59,7 @@ const infoCopy = {
     title: "איך זה עובד",
     paragraphs: [
       ["1. בוחרים קורס", "חפשו לפי שם או מספר קורס ונכנסים לבנק השאלות שלו."],
-      ["2. מסננים", "בחרו נושא, אופי שאלה, שנה, סמסטר ומועד — או חפשו מילים מתוך השאלה."],
+      ["2. מסננים", "בחרו נושא, אופי שאלה, מרצה, שנה, סמסטר ומועד — או חפשו מילים מתוך השאלה."],
       ["3. מנסים ורק אז פותחים רמז", "אפשר לסמן שסיימתם, לשמור שאלות שעזרו לכם ולהסתיר שאלות שכבר פתרתם."],
       ["4. מחזירים לקהילה", "משתמשים מחוברים יכולים לפרסם רמזים קצרים ולהצביע לרמזים מועילים."],
     ],
@@ -66,6 +68,15 @@ const infoCopy = {
 
 function normalize(value: string) {
   return value.trim().toLocaleLowerCase("he");
+}
+
+function splitInstructors(value: string) {
+  return value
+    .split(
+      /[,;\n]+|\s+(?:ו|and)(?=(?:פרופ(?:סור|[׳'"])?|ד[״"']?ר|prof\.?|dr\.?)\s)/i,
+    )
+    .map((instructor) => instructor.trim())
+    .filter(Boolean);
 }
 
 export function BankApp() {
@@ -232,6 +243,12 @@ export function BankApp() {
       if (!exam) return false;
       if (filters.topic && !question.topics.includes(filters.topic)) return false;
       if (filters.nature && question.nature !== filters.nature) return false;
+      if (
+        filters.instructor &&
+        !splitInstructors(exam.instructors).includes(filters.instructor)
+      ) {
+        return false;
+      }
       if (filters.year && String(exam.year) !== filters.year) return false;
       if (filters.semester && exam.semester !== filters.semester) return false;
       if (filters.moed && exam.moed !== filters.moed) return false;
@@ -274,6 +291,17 @@ export function BankApp() {
         .sort((left, right) => Number(right) - Number(left)) as number[],
     [bank.exams, courseQuestions],
   );
+
+  const instructors = useMemo(() => {
+    const examIds = new Set(courseQuestions.map((question) => question.examId));
+    return [
+      ...new Set(
+        [...examIds].flatMap((examId) =>
+          splitInstructors(bank.exams[examId]?.instructors ?? ""),
+        ),
+      ),
+    ].sort((left, right) => left.localeCompare(right, "he"));
+  }, [bank.exams, courseQuestions]);
 
   const courseHits = useMemo(() => {
     const query = normalize(courseSearch);
@@ -520,7 +548,7 @@ export function BankApp() {
               <span className="eyebrow orange">בנק תרגול חכם לסטודנטים</span>
               <h1>פחות זמן לחפש.<br />יותר זמן לפתור.</h1>
               <p>
-                כל שאלות המבחנים במקום אחד — מסודרות לפי נושא, סוג שאלה, שנה ומועד.
+                כל שאלות המבחנים במקום אחד — מסודרות לפי נושא, סוג שאלה, מרצה, שנה ומועד.
                 פותחים רמז רק כשבאמת נתקעים.
               </p>
               <div className="course-search">
@@ -622,6 +650,13 @@ export function BankApp() {
                   onChange={(value) => setFilters((current) => ({ ...current, nature: value }))}
                   options={Object.entries(selectedCourse.natures)}
                   placeholder="כל סוגי השאלות"
+                />
+                <FilterSelect
+                  label="מרצה"
+                  value={filters.instructor}
+                  onChange={(value) => setFilters((current) => ({ ...current, instructor: value }))}
+                  options={instructors.map((instructor) => [instructor, instructor])}
+                  placeholder="כל המרצים"
                 />
                 <FilterSelect
                   label="שנה"
