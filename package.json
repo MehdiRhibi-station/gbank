@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build",
-    "import:course": "node scripts/import-course.mjs"
+    "import:course": "node scripts/import-course.mjs",
+    "ingest:course": "node scripts/ingest-course.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",

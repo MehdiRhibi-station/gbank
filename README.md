@@ -45,6 +45,57 @@ npm run check
 ה־`SUPABASE_SERVICE_ROLE_KEY` מיועד רק לכלי הייבוא המקומי. אסור להוסיף אותו ל־GitHub,
 ל־Vercel או למשתנה שמתחיל ב־`NEXT_PUBLIC_`.
 
+## הוספת קורס אוטומטית לפי מספר קורס
+
+הפקודה הפרטית החדשה מחפשת במאגר הבחינות הרשמי של האוניברסיטה, מורידה רק את קובצי
+ה־PDF שהמאגר החזיר, מחלצת מהם שאלות לטיוטה, ולאחר אישור מעלה את הקורס ל־Supabase.
+היא רצה רק במחשב של בעל האתר; אין באתר כפתור או API שמאפשר למבקרים להפעיל אותה.
+
+לפני ההרצה, העתיקו את `.env.local.example` לקובץ `.env.local` והוסיפו:
+
+- `OPENAI_API_KEY` לחילוץ השאלות מה־PDF.
+- `NEXT_PUBLIC_SUPABASE_URL` ו־`SUPABASE_SERVICE_ROLE_KEY` להעלאה למסד הנתונים.
+
+ב־Windows, מתוך תיקיית `gbank-main`:
+
+```bat
+cd /d "C:\Users\mahde\Downloads\gbank-main"
+npm install
+copy .env.local.example .env.local
+notepad .env.local
+npm run ingest:course
+```
+
+הסקריפט יבקש מספר קורס וישאל אם להוריד את כל הבחינות משנת 2016 או רק את הבחינה
+החדשה ביותר. אפשר גם להריץ ישירות:
+
+```bat
+rem כל הבחינות משנת 2016 ועד השנה הנוכחית
+npm run ingest:course -- 80420 --all
+
+rem רק הבחינה החדשה ביותר
+npm run ingest:course -- 80420 --latest
+```
+
+הקבצים נשמרים ב־`imports\80420`, כולל `course-80420.json` שאפשר לבדוק ולערוך לפני
+האישור הסופי. ההרצה ניתנת לחידוש: קובצי PDF תקינים, חילוצים קיימים ושאלות שכבר
+נבדקו אינם נוצרים מחדש. כדי להוריד בלבד בלי חילוץ ובלי שינוי במסד:
+
+```bat
+npm run ingest:course -- 80420 --all --download-only
+```
+
+כדי ליצור טיוטה ולעצור תמיד לפני Supabase:
+
+```bat
+npm run ingest:course -- 80420 --all --draft-only
+notepad imports\80420\course-80420.json
+```
+
+לאחר הבדיקה, הריצו שוב את הפקודה הרגילה ואשרו את הייבוא. `--yes` מיועד להרצה
+אוטומטית רק לאחר שסומכים על התהליך. `--force-extract` מחלץ מחדש את הבחינות
+שנבחרו. הסקריפט אינו מוחק קבצים כברירת מחדל.
+
 ## הדרך החכמה להוסיף קורסים רבים
 
 שמרו לכל קורס תיקייה זמנית ב־Google Drive המקומי:
@@ -138,6 +189,7 @@ components/             Search, filters, cards, hints and authentication UI
 data/                   Built-in fallback data for courses 80131 and 80420
 lib/                    Data adapters, browser database client and local state
 scripts/import-course.mjs
+scripts/ingest-course.mjs
 supabase/migrations/    Database schema, policies and RPC functions
 legacy/                 The original one-file prototype and extraction tools
 ```
