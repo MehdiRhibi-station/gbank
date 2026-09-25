@@ -36,11 +36,15 @@ npm run check
 ## חיבור Supabase
 
 1. צרו פרויקט חדש ב־Supabase.
-2. פתחו את SQL Editor והריצו את הקובץ
-   `supabase/migrations/202609210001_initial_gbank.sql`.
-3. העתיקו `.env.local.example` אל `.env.local` ומלאו את שלושת הערכים.
-4. ב־Supabase Auth הגדירו את כתובת האתר המקומית ואת כתובת Vercel כ־Redirect URLs.
-5. ייבאו את הקורס הראשון באמצעות הפקודה בסעיף הבא.
+2. פתחו את SQL Editor והריצו לפי הסדר את הקבצים
+   `supabase/migrations/202609210001_initial_gbank.sql` ולאחריו
+   `supabase/migrations/202609260001_huji_only_auth.sql`.
+3. תחת **Authentication → Providers → Email** ודאו ש־**Confirm email** פעיל.
+   המיגרציה מגבילה הרשמה וכתיבה לכתובות HUJI, ואימות המייל מוכיח שהכתובת אכן
+   שייכת למשתמש.
+4. העתיקו `.env.local.example` אל `.env.local` ומלאו את שלושת הערכים.
+5. ב־Supabase Auth הגדירו את כתובת האתר המקומית ואת כתובת Vercel כ־Redirect URLs.
+6. ייבאו את הקורס הראשון באמצעות הפקודה בסעיף הבא.
 
 ה־`SUPABASE_SERVICE_ROLE_KEY` מיועד רק לכלי הייבוא המקומי. אסור להוסיף אותו ל־GitHub,
 ל־Vercel או למשתנה שמתחיל ב־`NEXT_PUBLIC_`.
