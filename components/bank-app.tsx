@@ -6,6 +6,7 @@ import { SearchIcon, UploadIcon } from "@/components/icons";
 import { QuestionCard } from "@/components/question-card";
 import { getSeedBankData, loadRemoteBankData } from "@/lib/bank-data";
 import { readLocalProgress, writeLocalProgress } from "@/lib/local-progress";
+import { matchesSearchText, normalizeSearchValue } from "@/lib/search";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase-browser";
 import type {
   BackendState,
@@ -65,10 +66,6 @@ const infoCopy = {
     ],
   },
 };
-
-function normalize(value: string) {
-  return value.trim().toLocaleLowerCase("he");
-}
 
 function splitInstructors(value: string) {
   return value
@@ -237,7 +234,7 @@ export function BankApp() {
 
   const visibleQuestions = useMemo(() => {
     if (!selectedCourse) return [];
-    const query = normalize(filters.query);
+    const query = normalizeSearchValue(filters.query);
     const result = courseQuestions.filter((question) => {
       const exam = bank.exams[question.examId];
       if (!exam) return false;
@@ -254,18 +251,25 @@ export function BankApp() {
       if (filters.moed && exam.moed !== filters.moed) return false;
       if (filters.hideSolved && progress[question.id]?.solved) return false;
       if (query) {
-        const searchable = normalize(
+        const searchable = normalizeSearchValue(
           [
             question.title,
             question.statement,
             question.context ?? "",
             selectedCourse.natures[question.nature] ?? question.nature,
             ...question.topics.map((topic) => selectedCourse.topics[topic] ?? topic),
+            selectedCourse.number,
+            question.number,
+            question.subpart,
             exam.instructors,
+            exam.year,
+            exam.semester,
+            exam.moed,
+            exam.sourceFilename,
             ...(hints[question.id] ?? []).map((hint) => hint.text),
           ].join(" "),
         );
-        if (!searchable.includes(query)) return false;
+        if (!matchesSearchText(searchable, query)) return false;
       }
       return true;
     });
@@ -304,9 +308,11 @@ export function BankApp() {
   }, [bank.exams, courseQuestions]);
 
   const courseHits = useMemo(() => {
-    const query = normalize(courseSearch);
     return bank.courses.filter((course) =>
-      normalize([course.number, course.name, ...course.aliases].join(" ")).includes(query),
+      matchesSearchText(
+        [course.number, course.name, course.department, ...course.aliases].join(" "),
+        courseSearch,
+      ),
     );
   }, [bank.courses, courseSearch]);
 
@@ -557,6 +563,12 @@ export function BankApp() {
                   type="search"
                   value={courseSearch}
                   onChange={(event) => setCourseSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && courseHits.length === 1) {
+                      event.preventDefault();
+                      openCourse(courseHits[0].number);
+                    }
+                  }}
                   placeholder="חפשו קורס לפי שם או מספר — למשל 80131"
                   aria-label="חיפוש קורס"
                 />
