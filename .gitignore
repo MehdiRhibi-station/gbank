@@ -9,3 +9,6 @@ out/
 .DS_Store
 imports/
 downloads/
+__pycache__/
+*.py[cod]
+.venv/

@@ -51,6 +51,45 @@ npm run check
 
 ## הוספת קורס אוטומטית לפי מספר קורס
 
+### פקודת Python אחת ישירות ל־Supabase
+
+המסלול הקצר ביותר אינו יוצר `data/course-XXXXX.json` ואינו מפעיל סקריפט Node.
+הוא מחפש את הבחינות, מוריד PDF, מחלץ שאלות עם Ollama המקומי ומעלה כל מבחן
+שהושלם ישירות למסד ול־Storage:
+
+```bat
+cd /d "C:\path\to\gbank-main"
+python -m pip install -r requirements-ingest.txt
+python fetch_range.py 80131
+```
+
+לפני ההרצה יש להגדיר ב־`.env.local` את `NEXT_PUBLIC_SUPABASE_URL`, את
+`SUPABASE_SERVICE_ROLE_KEY`, ואת הגדרות Ollama המופיעות בהמשך. המפתח בעל הרשאות
+מלאות ונשאר רק במחשב של בעל האתר. אין להוסיף אותו ל־GitHub או ל־Vercel.
+
+הפקודה מייבאת את כל הבחינות מ־2016 ועד השנה הנוכחית. היא בטוחה להרצה חוזרת:
+מבחן שכבר מכיל שאלות מדולג, מזהים קיימים נשמרים כדי לא לפגוע ברמזים ובהתקדמות,
+וכשל באמצע אינו מוחק מבחנים שכבר הושלמו. אפשרויות שימושיות:
+
+```bat
+rem בדיקה בלבד, בלי הורדה ובלי שינוי במסד
+python fetch_range.py 80131 --dry-run
+
+rem רק הבחינה החדשה ביותר
+python fetch_range.py 80131 --latest
+
+rem חילוץ מחדש של מבחנים שכבר קיימים
+python fetch_range.py 80131 --force-extract
+
+rem המשך למבחן הבא גם אם מבחן אחד נכשל
+python fetch_range.py 80131 --keep-going
+```
+
+קובצי ה־PDF נשמרים כברירת מחדל ב־`imports\COURSE_NUMBER` כדי שאפשר יהיה לחדש
+הורדה שנקטעה. להקטנת נפח אפשר להוסיף `--delete-pdfs-after-upload`; הקובץ המקומי
+יימחק רק לאחר שה־PDF והשאלות של אותו מבחן נשמרו בהצלחה. התהליך אינו שומר קובץ
+JSON ביניים.
+
 הפקודה הפרטית החדשה מחפשת במאגר הבחינות הרשמי של האוניברסיטה, מורידה רק את קובצי
 ה־PDF שהמאגר החזיר, מחלצת מהם שאלות לטיוטה, ולאחר אישור מעלה את הקורס ל־Supabase.
 היא רצה רק במחשב של בעל האתר; אין באתר כפתור או API שמאפשר למבקרים להפעיל אותה.
@@ -63,7 +102,7 @@ npm run check
 ב־Windows, מתוך תיקיית `gbank-main`:
 
 ```bat
-cd /d "C:\Users\mahde\Downloads\gbank-main"
+cd /d "C:\path\to\gbank-main"
 npm install
 copy .env.local.example .env.local
 notepad .env.local
@@ -112,7 +151,7 @@ notepad imports\80420\course-80420.json
 2. בקובץ `.env.local` הגדירו את תיקיית Google Drive המקומית:
 
 ```env
-GBANK_DRIVE_DIR=G:\My Drive\GBank Imports
+GBANK_DRIVE_DIR=C:\path\to\GBank Imports
 OLLAMA_MODEL=qwen3-vl:8b
 OLLAMA_URL=http://127.0.0.1:11434
 OLLAMA_CONTEXT_LENGTH=32768
@@ -150,25 +189,25 @@ GBank Imports/
 ראשית בצעו בדיקה שלא משנה דבר:
 
 ```bash
-npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131" --dry-run
+npm run import:course -- --data "C:/path/to/GBank Imports/80131/course-80131.json" --pdf-dir "C:/path/to/GBank Imports/80131" --dry-run
 ```
 
 לאחר שבדקתם את הרשימה, ייבאו והשאירו את המקור ב־Drive:
 
 ```bash
-npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131"
+npm run import:course -- --data "C:/path/to/GBank Imports/80131/course-80131.json" --pdf-dir "C:/path/to/GBank Imports/80131"
 ```
 
 האפשרות הבטוחה ביותר לניקוי היא להעביר את הקבצים לארכיון לאחר הצלחה:
 
 ```bash
-npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131" --archive-after-upload "C:/Google Drive/GBank Archive/80131"
+npm run import:course -- --data "C:/path/to/GBank Imports/80131/course-80131.json" --pdf-dir "C:/path/to/GBank Imports/80131" --archive-after-upload "C:/path/to/GBank Archive/80131"
 ```
 
 אם אתם בטוחים שאינכם צריכים עותק נוסף, אפשר למחוק רק את קובצי ה־PDF שהועלו בהצלחה:
 
 ```bash
-npm run import:course -- --data "C:/Google Drive/GBank Imports/80131/course-80131.json" --pdf-dir "C:/Google Drive/GBank Imports/80131" --delete-after-upload
+npm run import:course -- --data "C:/path/to/GBank Imports/80131/course-80131.json" --pdf-dir "C:/path/to/GBank Imports/80131" --delete-after-upload
 ```
 
 הסקריפט לא מוחק דבר כברירת מחדל. אם העלאה או כתיבה למסד הנתונים נכשלת, שלב הניקוי
@@ -229,6 +268,8 @@ data/                   Built-in fallback data for courses 80131 and 80420
 lib/                    Data adapters, browser database client and local state
 scripts/import-course.mjs
 scripts/ingest-course.mjs
+fetch_range.py          Python: HUJI → Ollama → Supabase בפקודה אחת
+requirements-ingest.txt
 supabase/migrations/    Database schema, policies and RPC functions
 legacy/                 The original one-file prototype and extraction tools
 ```
