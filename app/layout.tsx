@@ -20,6 +20,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body suppressHydrationWarning>
         {children}
+        <Script id="theme-initializer" strategy="beforeInteractive">
+          {`try{const saved=localStorage.getItem("gbank-theme");const theme=saved==="dark"||saved!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme}catch{}`}
+        </Script>
         <Script id="mathjax-config" strategy="beforeInteractive">
           {`window.MathJax={tex:{inlineMath:[[\"$\",\"$\"]],displayMath:[[\"$$\",\"$$\"]]},svg:{fontCache:\"global\"},startup:{typeset:false}};`}
         </Script>

@@ -2,7 +2,7 @@
 
 import type { User } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SearchIcon, UploadIcon } from "@/components/icons";
+import { MoonIcon, SearchIcon, SunIcon, UploadIcon } from "@/components/icons";
 import { QuestionCard } from "@/components/question-card";
 import { getSeedBankData, loadRemoteBankData } from "@/lib/bank-data";
 import { readLocalProgress, writeLocalProgress } from "@/lib/local-progress";
@@ -98,6 +98,11 @@ export function BankApp() {
   const [authMessage, setAuthMessage] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [toast, setToast] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    setDarkMode(document.documentElement.dataset.theme === "dark");
+  }, []);
 
   const refreshPublicData = useCallback(async () => {
     if (!supabase) return;
@@ -342,6 +347,15 @@ export function BankApp() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function toggleDarkMode() {
+    const nextDarkMode = !darkMode;
+    const theme = nextDarkMode ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem("gbank-theme", theme);
+    setDarkMode(nextDarkMode);
+  }
+
   async function updateProgress(questionId: string, field: keyof Progress) {
     const previous = progress[questionId] ?? EMPTY_PROGRESS;
     const next = { ...previous, [field]: !previous[field] };
@@ -541,6 +555,16 @@ export function BankApp() {
                 הרשמה
               </button>
             )}
+            <button
+              className="button button-quiet theme-toggle"
+              type="button"
+              onClick={toggleDarkMode}
+              aria-label={darkMode ? "מעבר למצב בהיר" : "מעבר למצב כהה"}
+              aria-pressed={darkMode}
+              title={darkMode ? "מצב בהיר" : "מצב כהה"}
+            >
+              {darkMode ? <SunIcon /> : <MoonIcon />}
+            </button>
           </div>
         </div>
       </header>
