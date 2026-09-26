@@ -6,6 +6,11 @@ import type { BankData, Course, Exam, LegacySeed, Question } from "@/lib/types";
 
 const seeds = [infiSeedJson, discreteMathSeedJson, probabilitySeedJson] as LegacySeed[];
 
+function scopedId(courseNumber: string, value: string) {
+  const prefix = `${courseNumber}:`;
+  return value.startsWith(prefix) ? value : `${prefix}${value}`;
+}
+
 function seedToBankData(seed: LegacySeed): BankData {
   const course: Course = {
     number: seed.course.number,
@@ -17,27 +22,30 @@ function seedToBankData(seed: LegacySeed): BankData {
   };
 
   const exams = Object.fromEntries(
-    Object.entries(seed.exams).map(([id, exam]) => [
-      id,
-      {
+    Object.entries(seed.exams).map(([sourceId, exam]) => {
+      const id = scopedId(course.number, sourceId);
+      return [
         id,
-        courseNumber: course.number,
-        ordinal: exam.n,
-        year: exam.y,
-        semester: exam.sem,
-        moed: exam.moed,
-        date: exam.date,
-        instructors: exam.teach,
-        sourceFilename: exam.file,
-        storagePath: null,
-        questionsToAnswer: exam.pick,
-      } satisfies Exam,
-    ]),
+        {
+          id,
+          courseNumber: course.number,
+          ordinal: exam.n,
+          year: exam.y,
+          semester: exam.sem,
+          moed: exam.moed,
+          date: exam.date,
+          instructors: exam.teach,
+          sourceFilename: exam.file,
+          storagePath: null,
+          questionsToAnswer: exam.pick,
+        } satisfies Exam,
+      ];
+    }),
   );
 
   const questions: Question[] = seed.questions.map((question) => ({
-    id: question.id,
-    examId: question.ex,
+    id: scopedId(course.number, question.id),
+    examId: scopedId(course.number, question.ex),
     ordinal: question.o,
     number: question.q,
     subpart: question.s,
