@@ -20,7 +20,7 @@ import {
 const HUJI_SEARCH_URL = "https://www4.huji.ac.il/htbin/exams/exams.cgi";
 const DEFAULT_FROM_YEAR = 2016;
 const DEFAULT_MODEL = "gpt-6-sol";
-const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 const DEFAULT_LOCAL_MODEL = "qwen3-vl:8b";
 const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
 
@@ -59,7 +59,7 @@ function usage() {
     "  --output-dir PATH             Work folder (default: imports/COURSE_NUMBER)",
     "  --model MODEL                 OpenAI extraction model",
     "  --gemini                      Extract with the Gemini API",
-    "  --gemini-model MODEL          Gemini model (default: gemini-3.8-flash)",
+    "  --gemini-model MODEL          Gemini model (default: gemini-3.5-flash-lite)",
     "  --local                       Extract with a local Ollama model (no AI API key)",
     "  --local-model MODEL           Ollama vision model (default: qwen3-vl:8b)",
     "  --ollama-url URL              Local Ollama server URL",
@@ -346,11 +346,37 @@ async function downloadExam(exam, directory) {
   }
 
   const partial = destination + ".part";
-  const response = await fetchWithTimeout(
-    exam.url,
-    { headers: { "User-Agent": "GBank owner import tool" } },
-    180000,
-  );
+  let response;
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    response = undefined;
+    try {
+      response = await fetchWithTimeout(
+        exam.url,
+        { headers: { "User-Agent": "GBank owner import tool" } },
+        180000,
+      );
+      if (response.ok || (response.status !== 429 && response.status < 500)) break;
+      lastError = new Error("HUJI returned HTTP " + response.status);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < 3) {
+      const delay = 1000 * 2 ** attempt;
+      console.log(
+        `  temporary download failure for ${exam.filename}; retrying in ${delay / 1000}s...`,
+      );
+      await wait(delay);
+    }
+  }
+  if (!response) {
+    throw new Error(
+      "Could not download " +
+        exam.filename +
+        ": " +
+        (lastError?.message || "network request failed"),
+    );
+  }
   if (!response.ok) {
     throw new Error("Could not download " + exam.filename + " (HTTP " + response.status + ")");
   }
@@ -627,7 +653,11 @@ async function extractPdfWithGemini(
     ":generateContent";
   const requestGap = Math.max(
     0,
-    Number.parseInt(process.env.GEMINI_REQUEST_GAP_MS || "1000", 10) || 0,
+    Number.parseInt(process.env.GEMINI_REQUEST_GAP_MS || "3000", 10) || 0,
+  );
+  const maxAttempts = Math.max(
+    1,
+    Number.parseInt(process.env.GEMINI_MAX_ATTEMPTS || "8", 10) || 8,
   );
   let lastLabel = "";
 
@@ -661,7 +691,7 @@ async function extractPdfWithGemini(
 
     let payload = {};
     let response;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       response = await fetchWithTimeout(
         endpoint,
         {
@@ -677,7 +707,7 @@ async function extractPdfWithGemini(
       payload = await response.json().catch(() => ({}));
       if (response.ok) break;
       const retryable = response.status === 429 || response.status >= 500;
-      if (!retryable || attempt === 3) {
+      if (!retryable || attempt === maxAttempts - 1) {
         const detail = payload?.error?.message || "HTTP " + response.status;
         throw new Error(
           `Gemini extraction failed for ${exam.filename}, page ${page.number}: ${detail}`,
@@ -686,8 +716,10 @@ async function extractPdfWithGemini(
       const retryAfter = Number.parseInt(response.headers.get("retry-after") || "", 10);
       const delay = Number.isFinite(retryAfter)
         ? retryAfter * 1000
-        : 3000 * 2 ** attempt;
-      console.log(`      Gemini rate limited; retrying in ${Math.ceil(delay / 1000)}s...`);
+        : Math.min(60000, 3000 * 2 ** attempt);
+      console.log(
+        `      Gemini temporarily unavailable or rate limited; retrying in ${Math.ceil(delay / 1000)}s...`,
+      );
       await wait(delay);
     }
 
