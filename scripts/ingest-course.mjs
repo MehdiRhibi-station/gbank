@@ -5,20 +5,23 @@ import {
   mkdir,
   readFile,
   rename,
-  stat,
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline/promises";
+import {
+  normaliseItem,
+  overlappingBoxes,
+  pagePrompt,
+} from "../lib/extraction-prompt.mjs";
 
 const HUJI_SEARCH_URL = "https://www4.huji.ac.il/htbin/exams/exams.cgi";
 const DEFAULT_FROM_YEAR = 2016;
 const DEFAULT_MODEL = "gpt-6-sol";
 const DEFAULT_LOCAL_MODEL = "qwen3-vl:8b";
 const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
-const MAX_PDF_BYTES = 50 * 1024 * 1024;
 
 const NATURE_LABELS = {
   compute: "חישוב",
@@ -394,6 +397,7 @@ function extractionSchema() {
             "context",
             "statement",
             "uncertain",
+            "bbox",
           ],
           properties: {
             questionNumber: stringField,
@@ -422,27 +426,22 @@ function extractionSchema() {
             context: stringField,
             statement: stringField,
             uncertain: { type: "boolean" },
+            bbox: {
+              type: "object",
+              additionalProperties: false,
+              required: ["x", "y", "w", "h"],
+              properties: {
+                x: { type: "number" },
+                y: { type: "number" },
+                w: { type: "number" },
+                h: { type: "number" },
+              },
+            },
           },
         },
       },
     },
   };
-}
-
-function extractionInstructions(courseNumber, filename) {
-  return [
-    "You are transcribing an official Hebrew University exam into a question bank.",
-    "Course number: " + courseNumber + ". Source filename: " + filename + ".",
-    "Read every page, including scanned pages. Preserve the original Hebrew wording.",
-    "Return one item for each MAIN numbered question, in source order.",
-    "Keep all subparts (א, ב, ג, etc.) together inside that main question statement.",
-    "Do not include solutions, answer keys, student handwriting, hints, or commentary.",
-    "Write mathematical notation as LaTeX between $...$ or $$...$$.",
-    "Use an empty string when metadata is not visible. Never invent missing text.",
-    "Set uncertain=true if any important part is illegible or ambiguous.",
-    "Choose short Hebrew topic labels. The title should be concise and useful for search.",
-    "Difficulty is an estimate based on the work required, not student performance.",
-  ].join("\n");
 }
 
 function responseText(payload) {
@@ -460,72 +459,105 @@ function responseText(payload) {
   throw new Error("OpenAI response did not contain structured text.");
 }
 
-async function extractPdf(pdfPath, exam, courseNumber, apiKey, model) {
-  const file = await stat(pdfPath);
-  if (file.size > MAX_PDF_BYTES) {
-    throw new Error(exam.filename + " is larger than the 50 MB PDF input limit.");
-  }
-  const base64 = (await readFile(pdfPath)).toString("base64");
-  const body = {
-    model,
-    input: [
-      {
-        role: "system",
-        content: [
-          {
-            type: "input_text",
-            text: extractionInstructions(courseNumber, exam.filename),
-          },
-        ],
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: "Transcribe this exam into the required JSON structure.",
-          },
-          {
-            type: "input_file",
-            filename: exam.filename,
-            file_data: "data:application/pdf;base64," + base64,
-            detail: "high",
-          },
-        ],
-      },
-    ],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "gbank_exam_extraction",
-        strict: true,
-        schema: extractionSchema(),
-      },
-    },
-    max_output_tokens: 20000,
-    store: false,
+function emptyExtraction() {
+  return {
+    courseName: "",
+    instructors: "",
+    examDate: "",
+    questionsToAnswer: "",
+    questions: [],
   };
+}
 
-  const response = await fetchWithTimeout(
-    "https://api.openai.com/v1/responses",
-    {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-    600000,
-  );
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = payload?.error?.message || "HTTP " + response.status;
-    throw new Error("OpenAI extraction failed for " + exam.filename + ": " + detail);
+function addPageExtraction(combined, raw, page, total) {
+  if (!Array.isArray(raw?.questions)) {
+    throw new Error(`Extraction for page ${page.number}/${total} has no questions array.`);
   }
-  const result = JSON.parse(responseText(payload));
-  if (!Array.isArray(result.questions)) {
-    throw new Error("Extraction for " + exam.filename + " has no questions array.");
+  for (const field of ["courseName", "instructors", "examDate", "questionsToAnswer"]) {
+    if (!combined[field] && raw[field]) combined[field] = String(raw[field]).trim();
+  }
+
+  const normalized = raw.questions.map((item) => normaliseItem(item, { page }));
+  for (const overlap of overlappingBoxes(normalized)) {
+    const issue = `bbox overlaps question ${overlap.secondLabel || overlap.second + 1}`;
+    normalized[overlap.first].uncertain = true;
+    normalized[overlap.first].bboxIssue ||= issue;
+    normalized[overlap.first].imageBbox = null;
+    normalized[overlap.second].uncertain = true;
+    normalized[overlap.second].bboxIssue ||=
+      `bbox overlaps question ${overlap.firstLabel || overlap.first + 1}`;
+    normalized[overlap.second].imageBbox = null;
+  }
+  combined.questions.push(...normalized);
+  return normalized
+    .map((question) => `${question.questionNumber ?? ""}${question.subpart ?? ""}`.trim())
+    .filter(Boolean)
+    .at(-1) ?? "";
+}
+
+async function extractPdf(pdfPath, exam, _courseNumber, apiKey, model, topics = {}) {
+  const pages = await renderPdfPages(pdfPath);
+  const result = emptyExtraction();
+  let lastLabel = "";
+  for (const page of pages) {
+    console.log(`      page ${page.number}/${pages.length}`);
+    const body = {
+      model,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: pagePrompt(exam, page, pages.length, topics, lastLabel),
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: "Index this page and return the required JSON." },
+            {
+              type: "input_image",
+              image_url: "data:image/png;base64," + page.base64,
+              detail: "high",
+            },
+          ],
+        },
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "gbank_page_extraction",
+          strict: true,
+          schema: extractionSchema(),
+        },
+      },
+      max_output_tokens: 10000,
+      store: false,
+    };
+
+    const response = await fetchWithTimeout(
+      "https://api.openai.com/v1/responses",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+      600000,
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload?.error?.message || "HTTP " + response.status;
+      throw new Error(
+        `OpenAI extraction failed for ${exam.filename}, page ${page.number}: ${detail}`,
+      );
+    }
+    const pageResult = JSON.parse(responseText(payload));
+    lastLabel = addPageExtraction(result, pageResult, page, pages.length) || lastLabel;
   }
   return result;
 }
@@ -642,77 +674,96 @@ async function ensureLocalModel(baseUrl, model, assumeYes) {
 
 async function renderPdfPages(pdfPath) {
   let pdf;
+  let sharp;
   try {
     ({ pdf } = await import("pdf-to-img"));
+    ({ default: sharp } = await import("sharp"));
   } catch {
     throw new Error("PDF renderer is missing. Run npm install, then try again.");
   }
 
-  const document = await pdf(pdfPath, { scale: 2, format: "jpeg" });
-  const images = [];
+  const document = await pdf(pdfPath, { scale: 2 });
+  const pages = [];
   try {
     for await (const page of document) {
-      images.push(Buffer.from(page).toString("base64"));
+      const buffer = Buffer.from(page);
+      const metadata = await sharp(buffer).metadata();
+      if (!metadata.width || !metadata.height) {
+        throw new Error("Rendered page has no dimensions in " + path.basename(pdfPath));
+      }
+      pages.push({
+        number: pages.length + 1,
+        width: metadata.width,
+        height: metadata.height,
+        base64: buffer.toString("base64"),
+      });
     }
   } finally {
     await document.destroy();
   }
-  if (!images.length) throw new Error("No pages could be rendered from " + path.basename(pdfPath));
-  return images;
+  if (!pages.length) throw new Error("No pages could be rendered from " + path.basename(pdfPath));
+  return pages;
 }
 
-async function extractPdfLocally(pdfPath, exam, courseNumber, baseUrl, model) {
-  const images = await renderPdfPages(pdfPath);
+async function extractPdfLocally(
+  pdfPath,
+  exam,
+  _courseNumber,
+  baseUrl,
+  model,
+  topics = {},
+) {
+  const pages = await renderPdfPages(pdfPath);
   const schema = extractionSchema();
-  const response = await fetchWithTimeout(
-    ollamaEndpoint(baseUrl, "/api/chat"),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        stream: false,
-        think: false,
-        keep_alive: "30m",
-        format: schema,
-        options: {
-          temperature: 0,
-          num_ctx: Number.parseInt(process.env.OLLAMA_CONTEXT_LENGTH || "32768", 10),
-        },
-        messages: [
-          {
-            role: "system",
-            content:
-              extractionInstructions(courseNumber, exam.filename) +
-              "\nReturn JSON that exactly matches this schema: " +
-              JSON.stringify(schema),
+  const result = emptyExtraction();
+  let lastLabel = "";
+  for (const page of pages) {
+    console.log(`      page ${page.number}/${pages.length}`);
+    const response = await fetchWithTimeout(
+      ollamaEndpoint(baseUrl, "/api/chat"),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          stream: false,
+          think: false,
+          keep_alive: "30m",
+          format: schema,
+          options: {
+            temperature: 0,
+            num_ctx: Number.parseInt(process.env.OLLAMA_CONTEXT_LENGTH || "32768", 10),
           },
-          {
-            role: "user",
-            content:
-              "These images are every page of the exam, in order. Transcribe the exam into the required structure.",
-            images,
-          },
-        ],
-      }),
-    },
-    60 * 60 * 1000,
-  );
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(
-      "Local extraction failed for " +
-        exam.filename +
-        ": " +
-        (payload.error || "HTTP " + response.status),
+          messages: [
+            {
+              role: "system",
+              content:
+                pagePrompt(exam, page, pages.length, topics, lastLabel) +
+                "\nReturn JSON that exactly matches this schema: " +
+                JSON.stringify(schema),
+            },
+            {
+              role: "user",
+              content: "Index this one exam page.",
+              images: [page.base64],
+            },
+          ],
+        }),
+      },
+      60 * 60 * 1000,
     );
-  }
-  const result = parseJsonResponse(
-    payload?.message?.content,
-    "Local extraction for " + exam.filename,
-  );
-  if (!Array.isArray(result.questions)) {
-    throw new Error("Local extraction for " + exam.filename + " has no questions array.");
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        `Local extraction failed for ${exam.filename}, page ${page.number}: ` +
+          (payload.error || "HTTP " + response.status),
+      );
+    }
+    const pageResult = parseJsonResponse(
+      payload?.message?.content,
+      `Local extraction for ${exam.filename}, page ${page.number}`,
+    );
+    lastLabel = addPageExtraction(result, pageResult, page, pages.length) || lastLabel;
   }
   return result;
 }
@@ -902,6 +953,9 @@ function normalizeDraft(
         ctx: String(question.context || "").trim() || undefined,
         st: String(question.statement || "").trim(),
         unc: Boolean(question.uncertain),
+        extractor: question.extractor || extraction.extractor || undefined,
+        imagePage: question.imagePage ?? undefined,
+        imageBbox: question.imageBbox ?? undefined,
       });
     }
   }
@@ -926,6 +980,9 @@ function normalizeDraft(
     question.o = index + 1;
     if (question.ctx === undefined) delete question.ctx;
     if (!question.unc) delete question.unc;
+    if (!question.extractor) delete question.extractor;
+    if (!question.imagePage) delete question.imagePage;
+    if (!question.imageBbox) delete question.imageBbox;
   });
 
   return data;
@@ -954,7 +1011,12 @@ function reusableExtraction(existing, exam) {
   if (!entry) return null;
   const [examId, storedExam] = entry;
   const questions = (existing.questions ?? []).filter((question) => question.ex === examId);
-  if (!questions.length) return null;
+  if (
+    !questions.length ||
+    questions.some((question) => !question.imagePage || !question.imageBbox)
+  ) {
+    return null;
+  }
   return {
     courseName: existing.course?.name || exam.courseName || "",
     instructors: storedExam.teach || "",
@@ -971,8 +1033,22 @@ function reusableExtraction(existing, exam) {
       context: question.ctx || "",
       statement: question.st || "",
       uncertain: Boolean(question.unc),
+      extractor: question.extractor || "reviewed-draft",
+      imagePage: question.imagePage,
+      imageBbox: question.imageBbox,
     })),
   };
+}
+
+function extractionHasCrops(extraction) {
+  return Boolean(
+    extraction &&
+      Array.isArray(extraction.questions) &&
+      extraction.questions.length &&
+      extraction.questions.every(
+        (question) => question.imagePage && question.imageBbox,
+      ),
+  );
 }
 
 async function runImporter(projectRoot, draftPath, outputDirectory, args) {
@@ -1137,9 +1213,13 @@ async function main() {
     }
     if (!args["force-extract"] && existsSync(cachePath)) {
       const cache = JSON.parse(await readFile(cachePath, "utf8"));
-      extractions.set(exam.filename, cache.result ?? cache);
-      console.log("  reused extraction cache for " + exam.filename);
-      continue;
+      const cachedExtraction = cache.result ?? cache;
+      if (extractionHasCrops(cachedExtraction)) {
+        extractions.set(exam.filename, cachedExtraction);
+        console.log("  reused image-aware extraction cache for " + exam.filename);
+        continue;
+      }
+      console.log("  ignored text-only extraction cache for " + exam.filename);
     }
     needsExtraction.push(exam);
   }
@@ -1167,7 +1247,14 @@ async function main() {
       }
       provider = "ollama-local";
       extract = (pdfPath, exam) =>
-        extractPdfLocally(pdfPath, exam, courseNumber, baseUrl, model);
+        extractPdfLocally(
+          pdfPath,
+          exam,
+          courseNumber,
+          baseUrl,
+          model,
+          existingResult.data?.topics ?? {},
+        );
     } else {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!isRealSecret(apiKey)) {
@@ -1189,7 +1276,14 @@ async function main() {
       model = args.model || process.env.OPENAI_EXTRACT_MODEL || DEFAULT_MODEL;
       provider = "openai";
       extract = (pdfPath, exam) =>
-        extractPdf(pdfPath, exam, courseNumber, apiKey, model);
+        extractPdf(
+          pdfPath,
+          exam,
+          courseNumber,
+          apiKey,
+          model,
+          existingResult.data?.topics ?? {},
+        );
     }
 
     console.log(
@@ -1206,6 +1300,10 @@ async function main() {
           exam.filename,
       );
       const result = await extract(pdfPaths.get(exam.filename), exam);
+      result.extractor = provider + ":" + model;
+      for (const question of result.questions) {
+        question.extractor ||= result.extractor;
+      }
       extractions.set(exam.filename, result);
       await writeJsonAtomic(
         path.join(cacheDirectory, exam.filename + ".json"),

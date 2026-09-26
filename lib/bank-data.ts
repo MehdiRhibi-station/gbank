@@ -19,6 +19,8 @@ function seedToBankData(seed: LegacySeed): BankData {
     department: seed.course.department ?? "החוג למתמטיקה, האוניברסיטה העברית",
     topics: seed.topics,
     natures: seed.natures,
+    allowUnverified: false,
+    textIsSource: false,
   };
 
   const exams = Object.fromEntries(
@@ -36,6 +38,7 @@ function seedToBankData(seed: LegacySeed): BankData {
           date: exam.date,
           instructors: exam.teach,
           sourceFilename: exam.file,
+          sourceHash: exam.sourceHash ?? null,
           storagePath: null,
           questionsToAnswer: exam.pick,
         } satisfies Exam,
@@ -57,6 +60,12 @@ function seedToBankData(seed: LegacySeed): BankData {
     context: question.ctx,
     statement: question.st,
     uncertain: question.unc,
+    extractionStatus: question.extractionStatus ?? "machine",
+    imagePath: question.imagePath ?? null,
+    imagePage: question.imagePage ?? null,
+    imageBbox: question.imageBbox ?? null,
+    imageWidth: question.imageWidth ?? null,
+    imageHeight: question.imageHeight ?? null,
   }));
 
   return { courses: [course], exams, questions };
@@ -71,6 +80,34 @@ export function getSeedBankData(): BankData {
   };
 }
 
+function addMissingSeedCourses(remote: BankData): BankData {
+  const seed = getSeedBankData();
+  const remoteCourseNumbers = new Set(remote.courses.map((course) => course.number));
+  const missingCourses = seed.courses.filter(
+    (course) => !remoteCourseNumbers.has(course.number),
+  );
+  if (!missingCourses.length) return remote;
+
+  const missingCourseNumbers = new Set(missingCourses.map((course) => course.number));
+  const missingExams = Object.fromEntries(
+    Object.entries(seed.exams).filter(([, exam]) =>
+      missingCourseNumbers.has(exam.courseNumber),
+    ),
+  );
+  const missingExamIds = new Set(Object.keys(missingExams));
+
+  return {
+    courses: [...remote.courses, ...missingCourses].sort((left, right) =>
+      left.number.localeCompare(right.number),
+    ),
+    exams: { ...missingExams, ...remote.exams },
+    questions: [
+      ...remote.questions,
+      ...seed.questions.filter((question) => missingExamIds.has(question.examId)),
+    ],
+  };
+}
+
 export async function loadRemoteBankData(): Promise<BankData | null> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
@@ -78,20 +115,20 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
   const [courseResult, examResult, questionResult] = await Promise.all([
     supabase
       .from("courses")
-      .select("number,name,aliases,department,topics,natures")
+      .select("number,name,aliases,department,topics,natures,allow_unverified,text_is_source")
       .eq("is_published", true)
       .order("number"),
     supabase
       .from("exams")
       .select(
-        "id,course_number,ordinal,year,semester,moed,exam_date,instructors,source_filename,storage_path,questions_to_answer",
+        "id,course_number,ordinal,year,semester,moed,exam_date,instructors,source_filename,source_hash,storage_path,questions_to_answer",
       )
       .eq("is_published", true)
       .order("ordinal"),
     supabase
-      .from("questions")
+      .from("live_questions")
       .select(
-        "id,exam_id,ordinal,question_number,subpart,points,nature,difficulty,topics,title,context,statement,uncertain",
+        "id,exam_id,ordinal,question_number,subpart,points,nature,difficulty,topics,title,context,statement,uncertain,extraction_status,image_path,image_page,image_bbox,image_width,image_height",
       )
       .eq("is_published", true)
       .order("ordinal"),
@@ -108,6 +145,8 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
     department: row.department ?? "האוניברסיטה העברית",
     topics: (row.topics ?? {}) as Record<string, string>,
     natures: (row.natures ?? {}) as Record<string, string>,
+    allowUnverified: Boolean(row.allow_unverified),
+    textIsSource: Boolean(row.text_is_source),
   }));
 
   const exams = Object.fromEntries(
@@ -123,6 +162,7 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
         date: row.exam_date ?? "",
         instructors: row.instructors ?? "",
         sourceFilename: row.source_filename,
+        sourceHash: row.source_hash,
         storagePath: row.storage_path,
         questionsToAnswer: row.questions_to_answer ?? "",
       } satisfies Exam,
@@ -145,7 +185,13 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
       context: row.context ?? undefined,
       statement: row.statement,
       uncertain: row.uncertain,
+      extractionStatus: row.extraction_status,
+      imagePath: row.image_path,
+      imagePage: row.image_page,
+      imageBbox: row.image_bbox,
+      imageWidth: row.image_width,
+      imageHeight: row.image_height,
     }));
 
-  return { courses, exams, questions };
+  return addMissingSeedCourses({ courses, exams, questions });
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -75,12 +76,20 @@ function validate(data) {
 
   const examIds = new Set(Object.keys(data.exams));
   const questionIds = new Set();
+  const printedIdentities = new Set();
   for (const question of data.questions) {
     if (!question.id) errors.push("Every question needs an id");
     if (questionIds.has(question.id)) errors.push(`Duplicate question id: ${question.id}`);
     questionIds.add(question.id);
     if (!examIds.has(question.ex)) errors.push(`Question ${question.id} refers to missing exam ${question.ex}`);
     if (!question.st) errors.push(`Question ${question.id} has no statement`);
+    const printedIdentity = `${question.ex}\u0000${question.q}\u0000${question.s ?? ""}`;
+    if (printedIdentities.has(printedIdentity)) {
+      errors.push(
+        `Duplicate printed question in ${question.ex}: ${question.q}${question.s ?? ""}`,
+      );
+    }
+    printedIdentities.add(printedIdentity);
   }
   if (errors.length) throw new Error(`Invalid course JSON:\n- ${errors.join("\n- ")}`);
 }
@@ -94,6 +103,10 @@ function chunks(items, size) {
   const result = [];
   for (let index = 0; index < items.length; index += size) result.push(items.slice(index, index + size));
   return result;
+}
+
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 async function upsertOrThrow(query, label) {
@@ -133,6 +146,15 @@ async function main() {
       localPath: pdfDirectory ? path.join(pdfDirectory, exam.file) : null,
     }))
     .filter((item) => item.localPath && existsSync(item.localPath));
+  const sourceHashes = new Map();
+  for (const item of localFiles) {
+    sourceHashes.set(item.sourceId, sha256(await readFile(item.localPath)));
+  }
+  for (const [sourceId, exam] of examEntries) {
+    if (!sourceHashes.has(sourceId) && exam.sourceHash) {
+      sourceHashes.set(sourceId, String(exam.sourceHash));
+    }
+  }
 
   console.log(`Course: ${data.course.name} (${data.course.number})`);
   console.log(`Exams: ${examEntries.length}`);
@@ -173,26 +195,97 @@ async function main() {
     "Course import failed",
   );
 
-  const examRows = examEntries.map(([sourceId, exam]) => ({
-    id: prefixedId(courseNumber, sourceId),
-    course_number: courseNumber,
-    ordinal: exam.n,
-    year: exam.y,
-    semester: exam.sem,
-    moed: exam.moed,
-    exam_date: exam.date,
-    instructors: exam.teach,
-    source_filename: exam.file,
-    questions_to_answer: exam.pick,
-    is_published: true,
-  }));
-  await upsertOrThrow(
-    supabase.from("exams").upsert(examRows, { onConflict: "id" }),
-    "Exam import failed",
+  const existingExamResult = await supabase
+    .from("exams")
+    .select("id,source_filename,source_hash")
+    .eq("course_number", courseNumber);
+  if (existingExamResult.error) {
+    throw new Error("Could not inspect existing exams: " + existingExamResult.error.message);
+  }
+  const existingByFilename = new Map(
+    (existingExamResult.data ?? []).map((exam) => [exam.source_filename, exam]),
+  );
+  const existingByHash = new Map(
+    (existingExamResult.data ?? [])
+      .filter((exam) => exam.source_hash)
+      .map((exam) => [exam.source_hash, exam]),
   );
 
+  // A single PDF sometimes appears under more than one derived HUJI filename.
+  // Collapse those aliases before writing so the source hash is a real dedupe
+  // key, then map every draft exam reference to the surviving database row.
+  const examGroups = new Map();
+  for (const [sourceId, exam] of examEntries) {
+    const digest = sourceHashes.get(sourceId) ?? null;
+    const key = digest ? `hash:${digest}` : `file:${exam.file}`;
+    const group = examGroups.get(key) ?? { sourceIds: [], sourceId, exam, digest };
+    group.sourceIds.push(sourceId);
+    examGroups.set(key, group);
+  }
+
+  const sourceIdToExamId = new Map();
+  const hashedExamRows = [];
+  const unhashedExamRows = [];
+  for (const group of examGroups.values()) {
+    const byHash = group.digest ? existingByHash.get(group.digest) : null;
+    const byFilename = existingByFilename.get(group.exam.file);
+    const existing = byHash ?? byFilename ?? null;
+    const targetId = existing?.id ?? prefixedId(courseNumber, group.sourceId);
+    for (const sourceId of group.sourceIds) sourceIdToExamId.set(sourceId, targetId);
+
+    if (
+      group.digest &&
+      !byHash &&
+      byFilename &&
+      byFilename.source_hash !== group.digest
+    ) {
+      await upsertOrThrow(
+        supabase
+          .from("exams")
+          .update({ source_hash: group.digest })
+          .eq("id", byFilename.id),
+        `Could not attach source hash to ${group.exam.file}`,
+      );
+    }
+
+    const row = {
+      id: targetId,
+      course_number: courseNumber,
+      ordinal: group.exam.n,
+      year: group.exam.y,
+      semester: group.exam.sem,
+      moed: group.exam.moed,
+      exam_date: group.exam.date,
+      instructors: group.exam.teach,
+      source_filename: byHash?.source_filename ?? group.exam.file,
+      source_hash: group.digest ?? existing?.source_hash ?? null,
+      questions_to_answer: group.exam.pick,
+      is_published: true,
+    };
+    (group.digest ? hashedExamRows : unhashedExamRows).push(row);
+  }
+  if (hashedExamRows.length) {
+    await upsertOrThrow(
+      supabase.from("exams").upsert(hashedExamRows, {
+        onConflict: "course_number,source_hash",
+      }),
+      "Hashed exam import failed",
+    );
+  }
+  if (unhashedExamRows.length) {
+    await upsertOrThrow(
+      supabase.from("exams").upsert(unhashedExamRows, {
+        onConflict: "course_number,source_filename",
+      }),
+      "Exam import failed",
+    );
+  }
+
   const uploadedFiles = [];
+  const uploadedExamIds = new Set();
   for (const item of localFiles) {
+    const targetExamId = sourceIdToExamId.get(item.sourceId);
+    if (uploadedExamIds.has(targetExamId)) continue;
     const storagePath = `${courseNumber}/${item.exam.file}`;
     const bytes = await readFile(item.localPath);
     const upload = await supabase.storage.from("exam-files").upload(storagePath, bytes, {
@@ -205,16 +298,17 @@ async function main() {
       supabase
         .from("exams")
         .update({ storage_path: storagePath })
-        .eq("id", prefixedId(courseNumber, item.sourceId)),
+        .eq("id", targetExamId),
       `Could not link ${item.exam.file}`,
     );
+    uploadedExamIds.add(targetExamId);
     uploadedFiles.push(item.localPath);
     console.log(`Uploaded ${item.exam.file}`);
   }
 
   const questionRows = data.questions.map((question) => ({
     id: prefixedId(courseNumber, question.id),
-    exam_id: prefixedId(courseNumber, question.ex),
+    exam_id: sourceIdToExamId.get(question.ex) ?? prefixedId(courseNumber, question.ex),
     ordinal: question.o,
     question_number: question.q,
     subpart: question.s ?? "",
@@ -226,14 +320,48 @@ async function main() {
     context: question.ctx ?? null,
     statement: question.st,
     uncertain: Boolean(question.unc),
-    is_published: true,
+    extractor: question.extractor ?? data.extractor ?? null,
+    retired_at: null,
   }));
   for (const batch of chunks(questionRows, 500)) {
     await upsertOrThrow(
-      supabase.from("questions").upsert(batch, { onConflict: "id" }),
+      supabase.from("questions").upsert(batch, {
+        onConflict: "exam_id,question_number,subpart",
+      }),
       "Question import failed",
     );
   }
+
+  // Verification status is intentionally never accepted from JSON. It can
+  // only be changed by mark_verified(). Image metadata is updated separately
+  // so an older text-only draft cannot erase a crop that is already in use.
+  for (const question of data.questions) {
+    if (!question.imagePage || !question.imageBbox) continue;
+    const update = {
+      image_page: question.imagePage,
+      image_bbox: question.imageBbox,
+    };
+    await upsertOrThrow(
+      supabase
+        .from("questions")
+        .update(update)
+        .eq("id", prefixedId(courseNumber, question.id)),
+      `Question image metadata failed for ${question.id}`,
+    );
+  }
+
+  // Retirement is deliberately last. A failed upsert leaves the old live set
+  // intact; a successful import hides missing questions without deleting their
+  // hints, votes or progress.
+  const keptIds = questionRows.map((question) => question.id);
+  const retireResult = await supabase.rpc("retire_missing_questions", {
+    p_course_number: courseNumber,
+    p_kept_ids: keptIds,
+  });
+  if (retireResult.error) {
+    throw new Error("Could not retire missing questions: " + retireResult.error.message);
+  }
+  console.log(`Retired ${retireResult.data ?? 0} missing question(s).`);
 
   if (archiveDirectory && uploadedFiles.length) {
     await mkdir(archiveDirectory, { recursive: true });

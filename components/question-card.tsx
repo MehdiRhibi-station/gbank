@@ -24,6 +24,7 @@ interface QuestionCardProps {
   stats: QuestionStats;
   progress: Progress;
   hints: Hint[];
+  imageUrl: string | null | undefined;
   onToggleLiked: () => void;
   onToggleSolved: () => void;
   onOpenHints: () => void;
@@ -40,6 +41,7 @@ export function QuestionCard({
   stats,
   progress,
   hints,
+  imageUrl,
   onToggleLiked,
   onToggleSolved,
   onOpenHints,
@@ -50,6 +52,7 @@ export function QuestionCard({
   const [hintsOpen, setHintsOpen] = useState(false);
   const [hintText, setHintText] = useState("");
   const [posting, setPosting] = useState(false);
+  const transcription = [question.context, question.statement].filter(Boolean).join("\n");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -93,8 +96,40 @@ export function QuestionCard({
         </div>
 
         <h2>{question.title}</h2>
-        {question.context && <p className="question-context">{question.context}</p>}
-        <p className="question-statement">{question.statement}</p>
+        {question.imagePath ? (
+          imageUrl === undefined ? (
+            <div className="question-scan-loading" role="status">
+              טוען את סריקת המקור…
+            </div>
+          ) : imageUrl ? (
+            <figure className="question-scan">
+              <img
+                src={imageUrl}
+                alt={transcription}
+                width={question.imageWidth ?? undefined}
+                height={question.imageHeight ?? undefined}
+                loading="lazy"
+              />
+              <span className="sr-only">{transcription}</span>
+            </figure>
+          ) : (
+            <div className="question-text-fallback">
+              <p className="question-source-notice">
+                סריקת המקור אינה זמינה כרגע. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות.
+              </p>
+              {question.context && <p className="question-context">{question.context}</p>}
+              <p className="question-statement">{question.statement}</p>
+            </div>
+          )
+        ) : (
+          <div className="question-text-fallback">
+            <p className="question-source-notice">
+              לשאלה הזאת עדיין אין חיתוך מהסריקה. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות.
+            </p>
+            {question.context && <p className="question-context">{question.context}</p>}
+            <p className="question-statement">{question.statement}</p>
+          </div>
+        )}
 
         <div className="question-footer">
           <div className="topic-list">

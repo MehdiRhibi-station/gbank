@@ -1,4 +1,12 @@
 export type Difficulty = "easy" | "mid" | "hard";
+export type ExtractionStatus = "machine" | "verified" | "corrected";
+
+export interface ImageBoundingBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 export interface Course {
   number: string;
@@ -7,6 +15,8 @@ export interface Course {
   department: string;
   topics: Record<string, string>;
   natures: Record<string, string>;
+  allowUnverified?: boolean;
+  textIsSource?: boolean;
 }
 
 export interface Exam {
@@ -19,6 +29,7 @@ export interface Exam {
   date: string;
   instructors: string;
   sourceFilename: string;
+  sourceHash?: string | null;
   storagePath?: string | null;
   questionsToAnswer: string;
 }
@@ -37,6 +48,13 @@ export interface Question {
   context?: string;
   statement: string;
   uncertain?: boolean;
+  extractionStatus?: ExtractionStatus;
+  imagePath?: string | null;
+  imageUrl?: string;
+  imagePage?: number | null;
+  imageBbox?: ImageBoundingBox | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
 }
 
 export interface BankData {
@@ -79,6 +97,7 @@ export interface LegacySeed {
       teach: string;
       file: string;
       pick: string;
+      sourceHash?: string;
     }
   >;
   topics: Record<string, string>;
@@ -97,5 +116,11 @@ export interface LegacySeed {
     ctx?: string;
     st: string;
     unc?: boolean;
+    extractionStatus?: ExtractionStatus;
+    imagePath?: string;
+    imagePage?: number;
+    imageBbox?: ImageBoundingBox;
+    imageWidth?: number;
+    imageHeight?: number;
   }>;
 }

@@ -90,6 +90,10 @@ export function BankApp() {
   const [hints, setHints] = useState<Record<string, Hint[]>>({});
   const [progress, setProgress] = useState<Record<string, Progress>>({});
   const [localPdfs, setLocalPdfs] = useState<Record<string, string>>({});
+  const [questionImageUrls, setQuestionImageUrls] = useState<
+    Record<string, string | null>
+  >({});
+  const requestedQuestionImages = useRef(new Set<string>());
   const localPdfUrls = useRef<Set<string>>(new Set());
   const pdfInput = useRef<HTMLInputElement>(null);
   const [infoOpen, setInfoOpen] = useState<InfoKey>(null);
@@ -293,6 +297,52 @@ export function BankApp() {
     });
     return result;
   }, [bank.exams, courseQuestions, filters, hints, progress, selectedCourse, stats]);
+
+  useEffect(() => {
+    const ids = visibleQuestions
+      .filter(
+        (question) =>
+          question.imagePath && !requestedQuestionImages.current.has(question.id),
+      )
+      .map((question) => question.id);
+    if (!ids.length) return;
+    ids.forEach((id) => requestedQuestionImages.current.add(id));
+
+    let active = true;
+    let settled = false;
+    void (async () => {
+      const resolved: Record<string, string | null> = Object.fromEntries(
+        ids.map((id) => [id, null]),
+      );
+      for (let index = 0; index < ids.length; index += 100) {
+        const batch = ids.slice(index, index + 100);
+        try {
+          const response = await fetch("/api/question-images", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: batch }),
+          });
+          if (!response.ok) continue;
+          const payload = (await response.json()) as {
+            urls?: Record<string, string>;
+          };
+          for (const id of batch) resolved[id] = payload.urls?.[id] ?? null;
+        } catch {
+          // Keep the null entries: QuestionCard will use its explicit,
+          // machine-extracted text fallback instead of hiding the question.
+        }
+      }
+      if (active) {
+        setQuestionImageUrls((current) => ({ ...current, ...resolved }));
+        settled = true;
+      }
+    })();
+
+    return () => {
+      active = false;
+      if (!settled) ids.forEach((id) => requestedQuestionImages.current.delete(id));
+    };
+  }, [visibleQuestions]);
 
   const years = useMemo(
     () =>
@@ -774,6 +824,7 @@ export function BankApp() {
                     stats={stats[question.id] ?? EMPTY_STATS}
                     progress={progress[question.id] ?? EMPTY_PROGRESS}
                     hints={hints[question.id] ?? []}
+                    imageUrl={questionImageUrls[question.id]}
                     onToggleLiked={() => void updateProgress(question.id, "liked")}
                     onToggleSolved={() => void updateProgress(question.id, "solved")}
                     onOpenHints={() => void recordView(question.id)}
