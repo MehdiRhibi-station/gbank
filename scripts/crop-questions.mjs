@@ -7,6 +7,7 @@ import path from "node:path";
 import process from "node:process";
 import { pdf } from "pdf-to-img";
 import sharp from "sharp";
+import { safeStorageSegment } from "../lib/storage-path.mjs";
 
 const STORAGE_BUCKET = "exam-files";
 const EXTRA_PADDING = 0.008;
@@ -64,10 +65,6 @@ async function loadEnvFile(filename) {
     }
     if (!process.env[key]) process.env[key] = value;
   }
-}
-
-function safeSegment(value) {
-  return String(value).replace(/[^\p{L}\p{N}._:-]+/gu, "-");
 }
 
 function paddedBox(box) {
@@ -207,9 +204,9 @@ async function main() {
         .toBuffer({ resolveWithObject: true });
       const storagePath = [
         "crops",
-        safeSegment(course),
-        safeSegment(examId),
-        safeSegment(question.id) + ".png",
+        safeStorageSegment(course),
+        safeStorageSegment(examId),
+        safeStorageSegment(question.id) + ".png",
       ].join("/");
 
       const upload = await supabase.storage

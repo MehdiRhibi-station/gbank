@@ -341,13 +341,22 @@ async function main() {
       image_page: question.imagePage,
       image_bbox: question.imageBbox,
     };
-    await upsertOrThrow(
-      supabase
-        .from("questions")
-        .update(update)
-        .eq("id", prefixedId(courseNumber, question.id)),
-      `Question image metadata failed for ${question.id}`,
-    );
+    const examId = sourceIdToExamId.get(question.ex) ?? prefixedId(courseNumber, question.ex);
+    const result = await supabase
+      .from("questions")
+      .update(update)
+      .eq("exam_id", examId)
+      .eq("question_number", question.q)
+      .eq("subpart", question.s ?? "")
+      .select("id");
+    if (result.error) {
+      throw new Error(`Question image metadata failed for ${question.id}: ${result.error.message}`);
+    }
+    if (result.data?.length !== 1) {
+      throw new Error(
+        `Question image metadata matched ${result.data?.length ?? 0} rows for ${question.id}`,
+      );
+    }
   }
 
   // Retirement is deliberately last. A failed upsert leaves the old live set

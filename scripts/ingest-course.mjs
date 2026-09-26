@@ -518,11 +518,9 @@ function addPageExtraction(combined, raw, page, total) {
     const issue = `bbox overlaps question ${overlap.secondLabel || overlap.second + 1}`;
     normalized[overlap.first].uncertain = true;
     normalized[overlap.first].bboxIssue ||= issue;
-    normalized[overlap.first].imageBbox = null;
     normalized[overlap.second].uncertain = true;
     normalized[overlap.second].bboxIssue ||=
       `bbox overlaps question ${overlap.firstLabel || overlap.first + 1}`;
-    normalized[overlap.second].imageBbox = null;
   }
   combined.questions.push(...normalized);
   return normalized
