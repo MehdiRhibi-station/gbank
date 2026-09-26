@@ -1,9 +1,10 @@
 import infiSeedJson from "@/data/course-80131.json";
+import discreteMathSeedJson from "@/data/course-80181.json";
 import probabilitySeedJson from "@/data/course-80420.json";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import type { BankData, Course, Exam, LegacySeed, Question } from "@/lib/types";
 
-const seeds = [infiSeedJson, probabilitySeedJson] as LegacySeed[];
+const seeds = [infiSeedJson, discreteMathSeedJson, probabilitySeedJson] as LegacySeed[];
 
 function seedToBankData(seed: LegacySeed): BankData {
   const course: Course = {
