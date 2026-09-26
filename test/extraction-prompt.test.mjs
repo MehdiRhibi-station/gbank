@@ -34,6 +34,17 @@ test("normaliseItem converts percentage and pixel boxes", () => {
     w: 0.702667,
     h: 0.278,
   });
+
+  const normalizedThousand = normaliseItem(
+    { bbox: { x: 100, y: 200, w: 800, h: 300, unit: "normalized_1000" } },
+    { page: 1 },
+  );
+  assert.deepEqual(normalizedThousand.imageBbox, {
+    x: 0.082,
+    y: 0.186,
+    w: 0.836,
+    h: 0.328,
+  });
 });
 
 test("normaliseItem widens narrow boxes and flags unusable coordinates", () => {
@@ -73,5 +84,6 @@ test("pagePrompt emphasizes source-safe, generous crops", () => {
   assert.match(prompt, /Page 2 of 6/);
   assert.match(prompt, /generous margins/);
   assert.match(prompt, /clipped exponent/);
+  assert.match(prompt, /normalized_1000/);
   assert.match(prompt, /1ב/);
 });

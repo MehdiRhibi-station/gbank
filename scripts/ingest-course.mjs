@@ -20,6 +20,7 @@ import {
 const HUJI_SEARCH_URL = "https://www4.huji.ac.il/htbin/exams/exams.cgi";
 const DEFAULT_FROM_YEAR = 2016;
 const DEFAULT_MODEL = "gpt-6-sol";
+const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 const DEFAULT_LOCAL_MODEL = "qwen3-vl:8b";
 const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
 
@@ -46,6 +47,7 @@ function usage() {
     "  npm run ingest:course -- 80420 --from 2016 --to 2026",
     "  npm run ingest:course -- 80420 --download-only",
     "  npm run ingest:course -- 80420 --draft-only",
+    "  npm run ingest:gemini -- 80420 --draft-only",
     "  npm run ingest:local",
     "",
     "Options:",
@@ -56,6 +58,8 @@ function usage() {
     "  --course-name NAME            Override the course name",
     "  --output-dir PATH             Work folder (default: imports/COURSE_NUMBER)",
     "  --model MODEL                 OpenAI extraction model",
+    "  --gemini                      Extract with the Gemini API",
+    "  --gemini-model MODEL          Gemini model (default: gemini-3.8-flash)",
     "  --local                       Extract with a local Ollama model (no AI API key)",
     "  --local-model MODEL           Ollama vision model (default: qwen3-vl:8b)",
     "  --ollama-url URL              Local Ollama server URL",
@@ -68,8 +72,8 @@ function usage() {
     "  --delete-after-upload         Delete PDFs after a successful import",
     "  --help                        Show this help",
     "",
-    "Local mode needs Ollama, but no OpenAI key. It renders the PDFs locally and",
-    "uses a vision model running on this computer. Database upload still requires",
+    "Gemini mode needs GEMINI_API_KEY in .env.local. Local mode needs Ollama but",
+    "no cloud AI key. Database upload still requires",
     "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
     "",
   ].join("\n"));
@@ -86,6 +90,7 @@ function parseArgs(argv) {
     "yes",
     "delete-after-upload",
     "local",
+    "gemini",
     "help",
   ]);
   const valueOptions = new Set([
@@ -94,6 +99,7 @@ function parseArgs(argv) {
     "course-name",
     "output-dir",
     "model",
+    "gemini-model",
     "local-model",
     "ollama-url",
     "drive-dir",
@@ -429,12 +435,16 @@ function extractionSchema() {
             bbox: {
               type: "object",
               additionalProperties: false,
-              required: ["x", "y", "w", "h"],
+              required: ["x", "y", "w", "h", "unit"],
               properties: {
                 x: { type: "number" },
                 y: { type: "number" },
                 w: { type: "number" },
                 h: { type: "number" },
+                unit: {
+                  type: "string",
+                  enum: ["fraction", "percent", "pixels", "normalized_1000"],
+                },
               },
             },
           },
@@ -558,6 +568,135 @@ async function extractPdf(pdfPath, exam, _courseNumber, apiKey, model, topics = 
     }
     const pageResult = JSON.parse(responseText(payload));
     lastLabel = addPageExtraction(result, pageResult, page, pages.length) || lastLabel;
+  }
+  return result;
+}
+
+function toGeminiSchema(value) {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map(toGeminiSchema);
+  const result = {};
+  if (value.type) result.type = String(value.type).toUpperCase();
+  if (value.enum) result.enum = value.enum;
+  if (value.required) result.required = value.required;
+  if (value.items) result.items = toGeminiSchema(value.items);
+  if (value.properties) {
+    result.properties = Object.fromEntries(
+      Object.entries(value.properties).map(([key, schema]) => [
+        key,
+        toGeminiSchema(schema),
+      ]),
+    );
+  }
+  return result;
+}
+
+function geminiResponseText(payload) {
+  const parts = payload?.candidates?.[0]?.content?.parts ?? [];
+  const text = parts
+    .filter((part) => typeof part?.text === "string")
+    .map((part) => part.text)
+    .join("")
+    .trim();
+  if (text) return text;
+  const reason = payload?.candidates?.[0]?.finishReason;
+  throw new Error(
+    "Gemini response did not contain JSON" + (reason ? ` (${reason})` : "."),
+  );
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function extractPdfWithGemini(
+  pdfPath,
+  exam,
+  _courseNumber,
+  apiKey,
+  model,
+  topics = {},
+) {
+  const pages = await renderPdfPages(pdfPath);
+  const result = emptyExtraction();
+  const schema = toGeminiSchema(extractionSchema());
+  const modelId = String(model).replace(/^models\//, "");
+  const endpoint =
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(modelId) +
+    ":generateContent";
+  const requestGap = Math.max(
+    0,
+    Number.parseInt(process.env.GEMINI_REQUEST_GAP_MS || "1000", 10) || 0,
+  );
+  let lastLabel = "";
+
+  for (const page of pages) {
+    console.log(`      page ${page.number}/${pages.length}`);
+    const body = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text:
+                pagePrompt(exam, page, pages.length, topics, lastLabel) +
+                "\nIndex this page and return the required JSON.",
+            },
+            {
+              inlineData: {
+                mimeType: "image/png",
+                data: page.base64,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: "application/json",
+        responseSchema: schema,
+      },
+    };
+
+    let payload = {};
+    let response;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      response = await fetchWithTimeout(
+        endpoint,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify(body),
+        },
+        600000,
+      );
+      payload = await response.json().catch(() => ({}));
+      if (response.ok) break;
+      const retryable = response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === 3) {
+        const detail = payload?.error?.message || "HTTP " + response.status;
+        throw new Error(
+          `Gemini extraction failed for ${exam.filename}, page ${page.number}: ${detail}`,
+        );
+      }
+      const retryAfter = Number.parseInt(response.headers.get("retry-after") || "", 10);
+      const delay = Number.isFinite(retryAfter)
+        ? retryAfter * 1000
+        : 3000 * 2 ** attempt;
+      console.log(`      Gemini rate limited; retrying in ${Math.ceil(delay / 1000)}s...`);
+      await wait(delay);
+    }
+
+    const pageResult = parseJsonResponse(
+      geminiResponseText(payload),
+      `Gemini extraction for ${exam.filename}, page ${page.number}`,
+    );
+    lastLabel = addPageExtraction(result, pageResult, page, pages.length) || lastLabel;
+    if (requestGap && page.number < pages.length) await wait(requestGap);
   }
   return result;
 }
@@ -1090,6 +1229,9 @@ async function main() {
   if (args.all && args.latest) {
     throw new Error("Choose either --all or --latest, not both.");
   }
+  if (args.local && args.gemini) {
+    throw new Error("Choose either --local or --gemini, not both.");
+  }
   if (args["delete-after-upload"] && args["archive-after-upload"]) {
     throw new Error(
       "Choose either --delete-after-upload or --archive-after-upload, not both.",
@@ -1255,12 +1397,44 @@ async function main() {
           model,
           existingResult.data?.topics ?? {},
         );
+    } else if (args.gemini) {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!isRealSecret(apiKey)) {
+        throw new Error(
+          needsExtraction.length +
+            " PDF(s) need extraction. Add GEMINI_API_KEY to .env.local. Downloaded files were kept.",
+        );
+      }
+      const approved = await confirm(
+        "Extract questions from " +
+          needsExtraction.length +
+          " PDF(s) with the Gemini API? This uses your Gemini API account",
+        args.yes,
+      );
+      if (!approved) {
+        console.log("Stopped before Gemini extraction. Downloaded PDFs were kept.");
+        return;
+      }
+      model =
+        args["gemini-model"] ||
+        process.env.GEMINI_EXTRACT_MODEL ||
+        DEFAULT_GEMINI_MODEL;
+      provider = "gemini";
+      extract = (pdfPath, exam) =>
+        extractPdfWithGemini(
+          pdfPath,
+          exam,
+          courseNumber,
+          apiKey,
+          model,
+          existingResult.data?.topics ?? {},
+        );
     } else {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!isRealSecret(apiKey)) {
         throw new Error(
           needsExtraction.length +
-            " PDF(s) need extraction. Add OPENAI_API_KEY to .env.local, or use npm run ingest:local. Downloaded files were kept.",
+            " PDF(s) need extraction. Add OPENAI_API_KEY to .env.local, use npm run ingest:gemini, or use npm run ingest:local. Downloaded files were kept.",
         );
       }
       const approved = await confirm(
