@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   groupByExamAndPage,
   pageStoragePath,
+  parseReviewJson,
   reviewRows,
   validPageNumber,
 } from "../lib/crop-safety.mjs";
@@ -24,6 +25,11 @@ test("source page paths are ASCII-safe and content-addressed", () => {
   assert.match(first, /^pages\/[A-Za-z0-9._/-]+\.png$/);
   assert.notEqual(first, second);
   assert.ok(!first.includes(":"));
+});
+
+test("review JSON accepts the UTF-8 BOM written by Windows PowerShell", () => {
+  const parsed = parseReviewJson('\uFEFF{"course":"80181","questions":[]}');
+  assert.equal(parsed.course, "80181");
 });
 
 test("only positive integer page numbers are accepted", () => {

@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { reviewRows } from "../lib/crop-safety.mjs";
+import { parseReviewJson, reviewRows } from "../lib/crop-safety.mjs";
 
 function usage() {
   console.log(`
@@ -88,7 +88,7 @@ async function main() {
 
   const projectRoot = process.cwd();
   const reviewPath = path.resolve(projectRoot, args.file);
-  const document = JSON.parse(await readFile(reviewPath, "utf8"));
+  const document = parseReviewJson(await readFile(reviewPath, "utf8"));
   const rows = reviewRows(document, course);
   const decided = rows.filter((row) => row.decision !== "pending");
   const approved = decided.filter((row) => row.decision === "approved");
