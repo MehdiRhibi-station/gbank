@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { groupCourseDraft } from "../lib/question-groups.mjs";
 
 function usage() {
   console.log(`
@@ -155,7 +156,8 @@ async function main() {
     ? path.resolve(projectRoot, args["archive-after-upload"])
     : null;
 
-  const data = JSON.parse(await readFile(dataPath, "utf8"));
+  const extractedData = JSON.parse(await readFile(dataPath, "utf8"));
+  const data = groupCourseDraft(extractedData);
   validate(data);
 
   const examEntries = Object.entries(data.exams);
@@ -178,7 +180,8 @@ async function main() {
 
   console.log(`Course: ${data.course.name} (${data.course.number})`);
   console.log(`Exams: ${examEntries.length}`);
-  console.log(`Questions: ${data.questions.length}`);
+  console.log(`Extracted rows: ${extractedData.questions.length}`);
+  console.log(`Main questions: ${data.questions.length}`);
   console.log(`Matching PDFs: ${localFiles.length}${pdfDirectory ? `/${examEntries.length}` : " (no --pdf-dir)"}`);
 
   if (args["dry-run"]) {
