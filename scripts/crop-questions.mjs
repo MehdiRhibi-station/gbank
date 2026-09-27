@@ -12,6 +12,7 @@ import {
   cropBoxToPixels,
   cropStoragePath,
   groupByExamAndPage,
+  paddedVerticalInkCrop,
   reviewCropImageName,
   reviewImageName,
   validFractionBox,
@@ -142,7 +143,16 @@ function reviewHtml(manifest) {
           <h2>שאלה ${escapeHtml(question.number)}${escapeHtml(question.subpart)}</h2>
           <p><strong>${escapeHtml(question.id)}</strong><br>${escapeHtml(question.sourceFilename)} — עמוד ${question.page}</p>
         </header>
-        <img class="crop-image" src="${encodeURI(question.localImage)}" alt="Question ${escapeHtml(question.number)}${escapeHtml(question.subpart)} source crop" loading="lazy">
+        <div class="crop-tools" aria-label="כלי הגדלה">
+          <button type="button" data-zoom="-25">−</button>
+          <span data-zoom-label>100%</span>
+          <button type="button" data-zoom="25">+</button>
+          <button type="button" data-zoom-reset>איפוס</button>
+          <a href="${encodeURI(question.localImage)}" target="_blank" rel="noreferrer">פתיחה בגודל מלא</a>
+        </div>
+        <div class="crop-viewport">
+          <img class="crop-image" src="${encodeURI(question.localImage)}" alt="Question ${escapeHtml(question.number)}${escapeHtml(question.subpart)} source crop" loading="lazy">
+        </div>
         <details>
           <summary>הצגת העמוד המלא להשוואה</summary>
           <div class="page-preview">
@@ -169,7 +179,8 @@ body{margin:0;background:#f7f4ed;color:#101936;font-family:Arial,sans-serif;line
 main{width:min(1100px,calc(100% - 28px));margin:32px auto}.intro,article{background:#fff;border:2px solid #101936;border-radius:14px;padding:18px;margin:0 0 24px;box-shadow:0 4px 0 #1019361a}
 h1,h2,p{margin-top:0}.warning{border-right:5px solid #ff5a1f;padding:10px 14px;background:#fff1eb}
 article header{display:flex;justify-content:space-between;gap:18px;align-items:start}article header p{direction:ltr;text-align:left;color:#5d6171}
-.crop-image,.page-preview img{display:block;width:100%;height:auto;border:1px solid #bbb;background:white}.crop-image{max-height:78vh;object-fit:contain}
+.crop-tools{display:flex;align-items:center;gap:8px;direction:rtl;margin:8px 0}.crop-tools a{margin-right:auto;color:#2853df;font-weight:700}.crop-tools span{min-width:48px;text-align:center;font-weight:700}
+.crop-viewport{max-height:85vh;overflow:auto;border:1px solid #bbb;background:white}.crop-image{display:block;width:100%;max-width:none;height:auto;background:white}.page-preview img{display:block;width:100%;height:auto;border:1px solid #bbb;background:white}
 details{margin-top:14px}summary{cursor:pointer;font-weight:700}.page-preview{position:relative;margin-top:10px}.highlight{position:absolute;border:4px solid #ff5a1f;background:#ff5a1f12;box-sizing:border-box;pointer-events:none}
 .choices{display:flex;gap:7px;direction:rtl;margin-top:16px;padding-top:14px;border-top:1px solid #ddd}button{padding:8px 12px;border:1px solid #101936;border-radius:8px;background:white;font-weight:700;cursor:pointer}button.selected[data-decision=approved]{background:#dff5e7;color:#17613b}button.selected[data-decision=rejected]{background:#ffe2db;color:#9c2f18}button.selected[data-decision=pending]{background:#eef0ff;color:#2853df}
 .download{position:sticky;bottom:12px;width:100%;margin-top:18px;padding:14px;background:#101936;color:white;font-size:17px}em{color:#a53016}
@@ -182,7 +193,7 @@ ${cards}
 </main><script>
 const manifest=${safeManifest};
 const decisions=manifest.questions.map(()=>"pending");
-document.addEventListener("click",event=>{const button=event.target.closest("button[data-index]");if(!button)return;const index=Number(button.dataset.index);decisions[index]=button.dataset.decision;button.parentElement.querySelectorAll("button").forEach(item=>item.classList.toggle("selected",item===button));});
+document.addEventListener("click",event=>{const zoom=event.target.closest("button[data-zoom],button[data-zoom-reset]");if(zoom){const article=zoom.closest("article");const image=article.querySelector(".crop-image");const label=article.querySelector("[data-zoom-label]");const current=Number(image.dataset.zoom||100);const next=zoom.hasAttribute("data-zoom-reset")?100:Math.max(50,Math.min(250,current+Number(zoom.dataset.zoom)));image.dataset.zoom=String(next);image.style.width=next+"%";label.textContent=next+"%";return;}const button=event.target.closest("button[data-index]");if(!button)return;const index=Number(button.dataset.index);decisions[index]=button.dataset.decision;button.parentElement.querySelectorAll("button").forEach(item=>item.classList.toggle("selected",item===button));});
 document.addEventListener("toggle",event=>{const details=event.target;if(!(details instanceof HTMLDetailsElement)||!details.open)return;const image=details.querySelector("img[data-full-src]");if(image&&!image.src)image.src=image.dataset.fullSrc;},true);
 document.getElementById("download").addEventListener("click",()=>{const output={course:manifest.course,generatedAt:new Date().toISOString(),questions:manifest.questions.map((question,index)=>({id:question.id,storagePath:question.storagePath,decision:decisions[index]}))};const blob=new Blob([JSON.stringify(output,null,2)],{type:"application/json"});const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="crop-decisions-"+manifest.course+".json";link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);});
 </script></body></html>`;
@@ -362,10 +373,26 @@ async function main() {
 
         let crop;
         try {
-          crop = await sharp(page.data)
+          const broadCrop = await sharp(page.data)
             .extract(pixelBox)
             .png({ compressionLevel: 9 })
             .toBuffer({ resolveWithObject: true });
+          const grayscale = await sharp(broadCrop.data)
+            .grayscale()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+          const contentBox = paddedVerticalInkCrop(
+            grayscale.data,
+            grayscale.info.width,
+            grayscale.info.height,
+            { channels: grayscale.info.channels },
+          );
+          crop = contentBox
+            ? await sharp(broadCrop.data)
+                .extract(contentBox)
+                .png({ compressionLevel: 9 })
+                .toBuffer({ resolveWithObject: true })
+            : broadCrop;
         } catch (error) {
           console.warn(`  skipped ${question.id}: ${error.message}`);
           continue;
