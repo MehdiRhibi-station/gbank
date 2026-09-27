@@ -11,6 +11,7 @@
     "import:course": "node scripts/import-course.mjs",
     "fetch:exams": "node scripts/fetch-exams.mjs",
     "crop:questions": "node scripts/crop-questions.mjs",
+    "review:crops": "node scripts/review-crops.mjs",
     "ingest:course": "node scripts/ingest-course.mjs",
     "ingest:gemini": "node scripts/ingest-course.mjs --gemini --all",
     "ingest:local": "node scripts/ingest-course.mjs --local --all",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckIcon, FileIcon, HeartIcon } from "@/components/icons";
 import type { Exam, Hint, Progress, Question, QuestionStats } from "@/lib/types";
 
@@ -52,7 +52,11 @@ export function QuestionCard({
   const [hintsOpen, setHintsOpen] = useState(false);
   const [hintText, setHintText] = useState("");
   const [posting, setPosting] = useState(false);
+  const scanFrame = useRef<HTMLDivElement>(null);
   const transcription = [question.context, question.statement].filter(Boolean).join("\n");
+  const hasApprovedImage = Boolean(
+    question.imagePath && question.cropReviewStatus === "approved",
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -76,6 +80,15 @@ export function QuestionCard({
     if (next) onOpenHints();
   }
 
+  function positionSourcePage() {
+    const frame = scanFrame.current;
+    const box = question.imageBbox;
+    if (!frame || !box) return;
+    window.requestAnimationFrame(() => {
+      frame.scrollTop = Math.max(0, box.y * frame.scrollHeight - 36);
+    });
+  }
+
   return (
     <article className={`question-card ${progress.solved ? "is-solved" : ""}`}>
       <div className="question-index" aria-label={`שאלה ${question.number}${question.subpart}`}>
@@ -96,20 +109,40 @@ export function QuestionCard({
         </div>
 
         <h2>{question.title}</h2>
-        {question.imagePath ? (
+        {hasApprovedImage ? (
           imageUrl === undefined ? (
             <div className="question-scan-loading" role="status">
               טוען את סריקת המקור…
             </div>
           ) : imageUrl ? (
             <figure className="question-scan">
-              <img
-                src={imageUrl}
-                alt={transcription}
-                width={question.imageWidth ?? undefined}
-                height={question.imageHeight ?? undefined}
-                loading="lazy"
-              />
+              <div className="question-scan-frame" ref={scanFrame}>
+                <div className="question-scan-page">
+                  <img
+                    src={imageUrl}
+                    alt={transcription}
+                    width={question.imageWidth ?? undefined}
+                    height={question.imageHeight ?? undefined}
+                    loading="lazy"
+                    onLoad={positionSourcePage}
+                  />
+                  {question.imageBbox && (
+                    <span
+                      className="question-scan-highlight"
+                      aria-hidden="true"
+                      style={{
+                        left: `${question.imageBbox.x * 100}%`,
+                        top: `${question.imageBbox.y * 100}%`,
+                        width: `${question.imageBbox.w * 100}%`,
+                        height: `${question.imageBbox.h * 100}%`,
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+              <figcaption>
+                דף המקור המלא מוצג כדי לא לחתוך נוסחאות. המסגרת הכתומה היא סימון עזר אוטומטי בלבד.
+              </figcaption>
               <span className="sr-only">{transcription}</span>
             </figure>
           ) : (
@@ -124,7 +157,9 @@ export function QuestionCard({
         ) : (
           <div className="question-text-fallback">
             <p className="question-source-notice">
-              לשאלה הזאת עדיין אין חיתוך מהסריקה. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות.
+              {question.imagePath
+                ? "תמונת המקור עדיין לא אושרה ולכן אינה מוצגת. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות."
+                : "לשאלה הזאת עדיין אין תמונת מקור. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות."}
             </p>
             {question.context && <p className="question-context">{question.context}</p>}
             <p className="question-statement">{question.statement}</p>

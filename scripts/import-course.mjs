@@ -77,6 +77,7 @@ function validate(data) {
   const examIds = new Set(Object.keys(data.exams));
   const questionIds = new Set();
   const printedIdentities = new Set();
+  const statementsByExam = new Map();
   for (const question of data.questions) {
     if (!question.id) errors.push("Every question needs an id");
     if (questionIds.has(question.id)) errors.push(`Duplicate question id: ${question.id}`);
@@ -90,6 +91,25 @@ function validate(data) {
       );
     }
     printedIdentities.add(printedIdentity);
+
+    const normalizedStatement = [question.ctx ?? "", question.st ?? ""]
+      .join(" ")
+      .normalize("NFKC")
+      .toLocaleLowerCase("he")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (normalizedStatement.length >= 20) {
+      const statementKey = `${question.ex}\u0000${normalizedStatement}`;
+      const previous = statementsByExam.get(statementKey);
+      if (previous) {
+        errors.push(
+          `Repeated extracted text in ${question.ex}: ${previous} and ${question.id}. ` +
+            "Check that the extractor did not copy one printed question twice.",
+        );
+      } else {
+        statementsByExam.set(statementKey, question.id);
+      }
+    }
   }
   if (errors.length) throw new Error(`Invalid course JSON:\n- ${errors.join("\n- ")}`);
 }

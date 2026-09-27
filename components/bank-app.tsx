@@ -20,6 +20,8 @@ import type {
 
 const EMPTY_STATS: QuestionStats = { likes: 0, views: 0, solves: 0 };
 const EMPTY_PROGRESS: Progress = { liked: false, solved: false };
+const EMPTY_BANK: BankData = { courses: [], exams: {}, questions: [] };
+const QUESTIONS_PER_PAGE = 20;
 
 type InfoKey = "about" | "how" | null;
 
@@ -78,9 +80,12 @@ function splitInstructors(value: string) {
 
 export function BankApp() {
   const supabase = getSupabaseBrowserClient();
-  const [bank, setBank] = useState<BankData>(() => getSeedBankData());
+  const supabaseConfigured = isSupabaseConfigured();
+  const [bank, setBank] = useState<BankData>(() =>
+    supabaseConfigured ? EMPTY_BANK : getSeedBankData(),
+  );
   const [backend, setBackend] = useState<BackendState>(
-    isSupabaseConfigured() ? "connecting" : "local",
+    supabaseConfigured ? "connecting" : "local",
   );
   const [user, setUser] = useState<User | null>(null);
   const [courseSearch, setCourseSearch] = useState("");
@@ -103,6 +108,7 @@ export function BankApp() {
   const [authBusy, setAuthBusy] = useState(false);
   const [toast, setToast] = useState("");
   const [darkMode, setDarkMode] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setDarkMode(document.documentElement.dataset.theme === "dark");
@@ -185,6 +191,7 @@ export function BankApp() {
         setBank(remote);
         setBackend("connected");
       } else {
+        setBank(EMPTY_BANK);
         setBackend("unavailable");
       }
       const currentUser = authResult.data.user;
@@ -298,11 +305,27 @@ export function BankApp() {
     return result;
   }, [bank.exams, courseQuestions, filters, hints, progress, selectedCourse, stats]);
 
+  const pageCount = Math.max(1, Math.ceil(visibleQuestions.length / QUESTIONS_PER_PAGE));
+  const pagedQuestions = useMemo(() => {
+    const start = (currentPage - 1) * QUESTIONS_PER_PAGE;
+    return visibleQuestions.slice(start, start + QUESTIONS_PER_PAGE);
+  }, [currentPage, visibleQuestions]);
+
   useEffect(() => {
-    const ids = visibleQuestions
+    setCurrentPage(1);
+  }, [filters, selectedCourseNumber]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, pageCount));
+  }, [pageCount]);
+
+  useEffect(() => {
+    const ids = pagedQuestions
       .filter(
         (question) =>
-          question.imagePath && !requestedQuestionImages.current.has(question.id),
+          question.imagePath &&
+          question.cropReviewStatus === "approved" &&
+          !requestedQuestionImages.current.has(question.id),
       )
       .map((question) => question.id);
     if (!ids.length) return;
@@ -342,7 +365,7 @@ export function BankApp() {
       active = false;
       if (!settled) ids.forEach((id) => requestedQuestionImages.current.delete(id));
     };
-  }, [visibleQuestions]);
+  }, [pagedQuestions]);
 
   const years = useMemo(
     () =>
@@ -395,6 +418,16 @@ export function BankApp() {
     setCourseSearch("");
     setFilters(initialFilters);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function goToResultsPage(page: number) {
+    setCurrentPage(Math.min(pageCount, Math.max(1, page)));
+    window.requestAnimationFrame(() => {
+      document.querySelector(".results-heading")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   }
 
   function toggleDarkMode() {
@@ -566,6 +599,13 @@ export function BankApp() {
   }
 
   const distinctExamCount = new Set(visibleQuestions.map((question) => question.examId)).size;
+  const firstVisibleQuestion = visibleQuestions.length
+    ? (currentPage - 1) * QUESTIONS_PER_PAGE + 1
+    : 0;
+  const lastVisibleQuestion = Math.min(
+    currentPage * QUESTIONS_PER_PAGE,
+    visibleQuestions.length,
+  );
   const totalSummary = bank.courses.reduce(
     (summary, course) => {
       const current = courseSummary(course);
@@ -666,7 +706,9 @@ export function BankApp() {
                   ? "המאגר מחובר"
                   : backend === "connecting"
                     ? "מתחבר למאגר…"
-                    : "תצוגה מקומית"}
+                    : backend === "unavailable"
+                      ? "המאגר אינו זמין"
+                      : "תצוגה מקומית"}
               </span>
             </div>
 
@@ -806,13 +848,18 @@ export function BankApp() {
             <div className="results-heading">
               <div>
                 <strong>{visibleQuestions.length} שאלות</strong>
-                <span>מתוך {distinctExamCount} מבחנים</span>
+                <span>
+                  מתוך {distinctExamCount} מבחנים
+                  {visibleQuestions.length > QUESTIONS_PER_PAGE
+                    ? ` · מוצגות ${firstVisibleQuestion}–${lastVisibleQuestion}`
+                    : ""}
+                </span>
               </div>
               <span className="hints-only"><i /> רמזים בלבד — בלי פתרונות מלאים</span>
             </div>
 
             <div className="question-list">
-              {visibleQuestions.map((question) => {
+              {pagedQuestions.map((question) => {
                 const exam = bank.exams[question.examId];
                 return (
                   <QuestionCard
@@ -841,6 +888,30 @@ export function BankApp() {
                 </div>
               )}
             </div>
+
+            {visibleQuestions.length > QUESTIONS_PER_PAGE && (
+              <nav className="pagination" aria-label="עמודי תוצאות">
+                <button
+                  className="button button-quiet"
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => goToResultsPage(currentPage - 1)}
+                >
+                  הקודם
+                </button>
+                <span aria-live="polite">
+                  עמוד <strong>{currentPage}</strong> מתוך {pageCount}
+                </span>
+                <button
+                  className="button button-quiet"
+                  type="button"
+                  disabled={currentPage === pageCount}
+                  onClick={() => goToResultsPage(currentPage + 1)}
+                >
+                  הבא
+                </button>
+              </nav>
+            )}
           </section>
         </main>
       )}

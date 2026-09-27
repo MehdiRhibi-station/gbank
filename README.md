@@ -17,7 +17,7 @@
 - התחברות המוגבלת לכתובות HUJI, רמזים קהילתיים, הצבעות ושמירת התקדמות.
 - ייבוא חוזר ובטוח: upsert במקום מחיקה, retirement לשאלות חסרות ושמירת מזהים.
 - מניעת כפילויות לפי זהות השאלה המודפסת ו־hash של קובץ המקור.
-- שער פרסום: שאלה במסלול image-first אינה יכולה להתפרסם ללא תמונת מקור.
+- שער פרסום כפול: שאלה במסלול image-first אינה יכולה להתפרסם ללא תמונת מקור שנבדקה ואושרה.
 - חילוץ בענן באמצעות Gemini או OpenAI, וחילוץ מקומי אופציונלי באמצעות Ollama.
 - נתוני fallback מקומיים, כך שאפשר להפעיל את הממשק גם לפני חיבור Supabase.
 
@@ -84,6 +84,7 @@ GEMINI_MAX_ATTEMPTS=8
    אם שתי רשומות טוענות שהן אותה שאלה מודפסת, תקנו אותן לפני המשך המיגרציה.
 5. `supabase/migrations/202609260003_pipeline_integrity.sql`
 6. `supabase/migrations/202609260004_image_first.sql`
+7. `supabase/migrations/202609270005_crop_review.sql` — המיגרציה מסתירה בכוונה את כל שאלות ה־image-first עד שתמונת המקור המדויקת שלהן נבדקת ומאושרת.
 
 לאחר מכן:
 
@@ -137,19 +138,43 @@ npm run import:course -- --data ".\imports\80181\course-80181.json" --pdf-dir ".
 הייבוא מבצע upsert לבחינות ולשאלות, מעלה את קובצי המקור, ומסמן שאלות ישנות
 שנעלמו כ־retired. הוא אינו מוחק נתוני משתמשים ואינו מפרסם אוטומטית שאלות חדשות.
 
-### 3. יצירת חיתוכי המקור
+### 3. יצירת תמונות מקור בטוחות
+
+הכלי אינו סומך עוד על מלבן ה־AI לצורך חיתוך. הוא מרנדר את **דף המקור המלא**,
+מעלה כל דף פעם אחת ומשייך אותו לשאלות שבעמוד. המלבן נשאר רק כסימון כתום שניתן
+לגלול אליו; גם אם הוא שגוי, שום נוסחה אינה נחתכת.
+
+אפשר להכין מדגם מקומי של 10 שאלות בלי לשנות את Supabase:
 
 ```powershell
-npm run crop:questions -- 80181 --pdf-dir ".\imports\80181" --dry-run
-npm run crop:questions -- 80181 --pdf-dir ".\imports\80181"
+npm run crop:questions -- 80181 --pdf-dir ".\imports\80181" --force --limit 10 --prepare-only
+Start-Process ".\crop-review\80181\index.html"
 ```
 
-כל PDF מרונדר פעם אחת. כל crop מועלה לפני ש־`image_path` נכתב למסד, כך שכשל
-באמצע אינו משאיר שאלה שמפנה לקובץ שאינו קיים.
+לאחר שהמדגם נראה תקין, יוצרים מחדש את כל התמונות. `--force` חשוב כאן: הוא
+מחליף גם את החיתוכים הישנים והפגומים. כל תמונה חדשה נרשמת כ־`pending` והשאלה
+נשארת מוסתרת.
 
-### 4. בדיקה ופרסום
+```powershell
+npm run crop:questions -- 80181 --pdf-dir ".\imports\80181" --force
+Start-Process ".\crop-review\80181\index.html"
+```
 
-בדקו את הכיסוי ב־Supabase:
+### 4. בדיקה ואישור
+
+בקובץ `crop-review\80181\index.html` בדקו לכל שאלה שהעמוד שייך למבחן הנכון
+ושמספר השאלה מופיע בו. סמנו **תקין**, **דחייה** או **ממתין**, ולחצו על הורדת
+קובץ ההחלטות. לאחר מכן מריצים קודם dry run:
+
+```powershell
+npm run review:crops -- 80181 --file "$env:USERPROFILE\Downloads\crop-decisions-80181.json" --dry-run
+npm run review:crops -- 80181 --file "$env:USERPROFILE\Downloads\crop-decisions-80181.json" --publish
+```
+
+הכלי מסרב להחלטה ישנה אם `image_path` השתנה מאז הבדיקה. רק שאלות שסומנו
+`approved` מתפרסמות; שאלות שנדחו או נשארו ממתינות נשארות מוסתרות.
+
+בדיקת כיסוי ב־Supabase:
 
 ```sql
 select *
@@ -158,19 +183,9 @@ where course_number = '80181'
 order by year, semester, moed;
 ```
 
-הריצו את האתר, בדקו שהמספר, הנוסח, הנוסחאות והתרשימים אינם חתוכים, ורק אז פרסמו.
-לפרסום ראשוני בטוח אפשר להתחיל מהשאלות שלא סומנו כלא־ודאיות:
-
-```sql
-update public.questions as question
-set is_published = true
-from public.exams as exam
-where question.exam_id = exam.id
-  and exam.course_number = '80181'
-  and question.retired_at is null
-  and question.image_path is not null
-  and not question.uncertain;
-```
+העמודות `imaged` ו־`image_approved` מראות כמה שאלות קיבלו תמונה וכמה עברו
+בדיקה אנושית. אין לפרסם שאלות ישירות ב־SQL; שער הפרסום במסד דורש אישור של
+התמונה המדויקת.
 
 ## מחלצים חלופיים
 
@@ -202,7 +217,8 @@ npm run ingest:local -- 80181 --draft-only
 | `npm run ingest:course -- COURSE` | חילוץ באמצעות OpenAI |
 | `npm run ingest:local -- COURSE` | חילוץ באמצעות Ollama |
 | `npm run import:course -- ...` | dry run או ייבוא ל־Supabase |
-| `npm run crop:questions -- COURSE` | יצירה והעלאה של חיתוכי המקור |
+| `npm run crop:questions -- COURSE` | יצירה והעלאה של דפי מקור מלאים במצב pending |
+| `npm run review:crops -- COURSE --file PATH` | אימות החלטות בדיקה ופרסום מאושר בלבד |
 
 ## בדיקות לפני commit או deploy
 
@@ -220,10 +236,10 @@ npm run check
 ```text
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
 ```
 
-אין להוסיף לפריסת הדפדפן את `GEMINI_API_KEY`. כלי החילוץ מיועד להרצה פרטית על
-המחשב של בעל האתר, ולא קיים באתר endpoint ציבורי שמפעיל אותו.
+`SUPABASE_SERVICE_ROLE_KEY` נדרש ב־Vercel רק לקוד השרת שחותם קישורים ל־bucket הפרטי. הגדירו אותו כ־Secret רגיל ולעולם לא בשם שמתחיל ב־`NEXT_PUBLIC_`. אין להוסיף ל־Vercel את `GEMINI_API_KEY`; כלי החילוץ רץ רק במחשב של בעל האתר.
 
 ## עקרונות בטיחות הנתונים
 
@@ -233,7 +249,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 - `source_hash` מונע העלאה כפולה של אותו PDF תחת שמות שונים.
 - זהות מודפסת ייחודית מונעת כפילות של אותה שאלה או תת־שאלה.
 - שינוי בתמלול מנקה סטטוס אימות קודם.
-- קורס image-first דורש crop קיים לפני פרסום.
+- קורס image-first דורש תמונת מקור קיימת וגם `crop_review_status = 'approved'` לפני פרסום.
+- החלפת תמונה, עמוד או bbox מבטלת את האישור ומסתירה את השאלה אוטומטית.
+- החלטת בדיקה כוללת את נתיב התמונה המדויק, ולכן אי אפשר לאשר בטעות תמונה שהוחלפה.
 - כשל בחתימת URL מחזיר את כרטיס השאלה ל־fallback טקסטואלי מסומן, במקום להעלים אותו.
 
 ## מבנה הפרויקט
@@ -245,7 +263,8 @@ data/                        Local fallback course data
 lib/                         Data adapters, search and extraction helpers
 scripts/ingest-course.mjs    HUJI → AI → reviewed draft
 scripts/import-course.mjs    Safe Supabase upsert and retirement
-scripts/crop-questions.mjs   PDF rendering and crop upload
+scripts/crop-questions.mjs   Safe full-page rendering and pending upload
+scripts/review-crops.mjs      Exact-image review and controlled publication
 scripts/fetch-exams.mjs      Resumable HUJI downloader
 supabase/migrations/         Schema, RLS and integrity rules
 test/                        Extraction and bounding-box tests

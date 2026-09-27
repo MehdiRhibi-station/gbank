@@ -66,6 +66,7 @@ function seedToBankData(seed: LegacySeed): BankData {
     imageBbox: question.imageBbox ?? null,
     imageWidth: question.imageWidth ?? null,
     imageHeight: question.imageHeight ?? null,
+    cropReviewStatus: question.cropReviewStatus ?? "pending",
   }));
 
   return { courses: [course], exams, questions };
@@ -77,34 +78,6 @@ export function getSeedBankData(): BankData {
     courses: banks.flatMap((bank) => bank.courses),
     exams: Object.assign({}, ...banks.map((bank) => bank.exams)),
     questions: banks.flatMap((bank) => bank.questions),
-  };
-}
-
-function addMissingSeedCourses(remote: BankData): BankData {
-  const seed = getSeedBankData();
-  const remoteCourseNumbers = new Set(remote.courses.map((course) => course.number));
-  const missingCourses = seed.courses.filter(
-    (course) => !remoteCourseNumbers.has(course.number),
-  );
-  if (!missingCourses.length) return remote;
-
-  const missingCourseNumbers = new Set(missingCourses.map((course) => course.number));
-  const missingExams = Object.fromEntries(
-    Object.entries(seed.exams).filter(([, exam]) =>
-      missingCourseNumbers.has(exam.courseNumber),
-    ),
-  );
-  const missingExamIds = new Set(Object.keys(missingExams));
-
-  return {
-    courses: [...remote.courses, ...missingCourses].sort((left, right) =>
-      left.number.localeCompare(right.number),
-    ),
-    exams: { ...missingExams, ...remote.exams },
-    questions: [
-      ...remote.questions,
-      ...seed.questions.filter((question) => missingExamIds.has(question.examId)),
-    ],
   };
 }
 
@@ -128,7 +101,7 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
     supabase
       .from("live_questions")
       .select(
-        "id,exam_id,ordinal,question_number,subpart,points,nature,difficulty,topics,title,context,statement,uncertain,extraction_status,image_path,image_page,image_bbox,image_width,image_height",
+        "id,exam_id,ordinal,question_number,subpart,points,nature,difficulty,topics,title,context,statement,uncertain,extraction_status,image_path,image_page,image_bbox,image_width,image_height,crop_review_status",
       )
       .eq("is_published", true)
       .order("ordinal"),
@@ -191,7 +164,11 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
       imageBbox: row.image_bbox,
       imageWidth: row.image_width,
       imageHeight: row.image_height,
+      cropReviewStatus: row.crop_review_status,
     }));
 
-  return addMissingSeedCourses({ courses, exams, questions });
+  // Once Supabase is available it is the only public source of truth. Mixing
+  // tracked demo JSON into a live database can resurrect retired questions or
+  // make a course appear published without passing the database review gates.
+  return { courses, exams, questions };
 }

@@ -7,7 +7,10 @@ const SIGNED_URL_LIFETIME_SECONDS = 60 * 60;
 
 function getServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Private Storage objects must be signed on the server. The anon key cannot
+  // reliably sign a private bucket and must not be treated as an equivalent
+  // fallback. This secret is never serialized into the client bundle.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -45,9 +48,10 @@ export async function signedImagesForQuestionIds(questionIds: string[]) {
   try {
     const result = await client
       .from("live_questions")
-      .select("id,image_path")
+      .select("id,image_path,crop_review_status")
       .in("id", ids)
       .eq("is_published", true)
+      .eq("crop_review_status", "approved")
       .not("image_path", "is", null);
     if (result.error || !result.data) return {} as Record<string, string>;
 
@@ -66,4 +70,3 @@ export async function signedImagesForQuestionIds(questionIds: string[]) {
     return {} as Record<string, string>;
   }
 }
-

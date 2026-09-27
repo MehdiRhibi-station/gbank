@@ -1,5 +1,6 @@
 export type Difficulty = "easy" | "mid" | "hard";
 export type ExtractionStatus = "machine" | "verified" | "corrected";
+export type CropReviewStatus = "pending" | "approved" | "rejected";
 
 export interface ImageBoundingBox {
   x: number;
@@ -55,6 +56,7 @@ export interface Question {
   imageBbox?: ImageBoundingBox | null;
   imageWidth?: number | null;
   imageHeight?: number | null;
+  cropReviewStatus?: CropReviewStatus;
 }
 
 export interface BankData {
@@ -122,5 +124,6 @@ export interface LegacySeed {
     imageBbox?: ImageBoundingBox;
     imageWidth?: number;
     imageHeight?: number;
+    cropReviewStatus?: CropReviewStatus;
   }>;
 }
