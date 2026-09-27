@@ -433,6 +433,10 @@ textarea:focus-visible {
   background: #fff;
   overscroll-behavior: contain;
 }
+.question-scan-frame.is-question-crop {
+  max-height: none;
+  overflow: hidden;
+}
 .question-scan-page { position: relative; }
 .question-scan img { display: block; width: 100%; height: auto; margin-inline: auto; }
 .question-scan-highlight {

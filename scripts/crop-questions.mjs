@@ -8,9 +8,12 @@ import process from "node:process";
 import { pdf } from "pdf-to-img";
 import sharp from "sharp";
 import {
+  cropBoxToPixels,
+  cropStoragePath,
   groupByExamAndPage,
-  pageStoragePath,
+  reviewCropImageName,
   reviewImageName,
+  validFractionBox,
   validPageNumber,
 } from "../lib/crop-safety.mjs";
 
@@ -18,7 +21,7 @@ const STORAGE_BUCKET = "exam-files";
 
 function usage() {
   console.log(`
-Create reviewable source images without trusting machine crop coordinates
+Create one reviewable, padded source crop for each question
 
 Usage:
   npm run crop:questions -- 80181 --pdf-dir ".\\imports\\80181"
@@ -34,10 +37,10 @@ Options:
   --help              Show this help
 
 Safety model:
-  The complete original page is used for every question on that page. This is
-  intentionally looser than an AI crop: extra context is harmless; clipped
-  notation is not. One page image is uploaded once and shared by its questions.
-  Every linked image remains unpublished and pending until review:crops approves
+  Machine coordinates are padded and converted to a separate image for each
+  question. Missing or invalid boxes are skipped and remain unpublished. The
+  local review bundle shows each crop beside an optional complete-page view.
+  Every linked crop remains unpublished and pending until review:crops approves
   that exact storage path.
 `);
 }
@@ -127,34 +130,31 @@ function escapeHtml(value) {
 }
 
 function reviewHtml(manifest) {
-  const grouped = new Map();
-  manifest.questions.forEach((question, index) => {
-    const current = grouped.get(question.localImage) ?? [];
-    current.push({ ...question, index });
-    grouped.set(question.localImage, current);
-  });
-  const cards = [...grouped.entries()]
-    .map(([image, questions]) => {
-      const first = questions[0];
-      const rows = questions
-        .map(
-          (question) => `<li data-row="${question.index}">
-            <div><strong>${escapeHtml(question.id)}</strong><br>
-              שאלה ${escapeHtml(question.number)}${escapeHtml(question.subpart)}
-              ${question.linked ? "" : "<em> — טרם הועלה</em>"}
-            </div>
-            <div class="choices" role="group" aria-label="Review decision">
-              <button data-index="${question.index}" data-decision="approved">תקין</button>
-              <button data-index="${question.index}" data-decision="rejected">דחייה</button>
-              <button data-index="${question.index}" data-decision="pending" class="selected">ממתין</button>
-            </div>
-          </li>`,
-        )
-        .join("");
-      return `<article>
-        <header><h2>${escapeHtml(first.sourceFilename)} — עמוד ${first.page}</h2></header>
-        <img src="${encodeURI(image)}" alt="Original exam page ${first.page}" loading="lazy">
-        <ul>${rows}</ul>
+  const cards = manifest.questions
+    .map((question, index) => {
+      const box = validFractionBox(question.bbox);
+      const highlight = box
+        ? `<span class="highlight" aria-hidden="true" style="left:${box.x * 100}%;top:${box.y * 100}%;width:${box.w * 100}%;height:${box.h * 100}%"></span>`
+        : "";
+      return `<article data-row="${index}">
+        <header>
+          <h2>שאלה ${escapeHtml(question.number)}${escapeHtml(question.subpart)}</h2>
+          <p><strong>${escapeHtml(question.id)}</strong><br>${escapeHtml(question.sourceFilename)} — עמוד ${question.page}</p>
+        </header>
+        <img class="crop-image" src="${encodeURI(question.localImage)}" alt="Question ${escapeHtml(question.number)}${escapeHtml(question.subpart)} source crop" loading="lazy">
+        <details>
+          <summary>הצגת העמוד המלא להשוואה</summary>
+          <div class="page-preview">
+            <img data-full-src="${encodeURI(question.localPageImage)}" alt="Original exam page ${question.page}">
+            ${highlight}
+          </div>
+        </details>
+        ${question.linked ? "" : "<p><em>התמונה לא קושרה למסד הנתונים.</em></p>"}
+        <div class="choices" role="group" aria-label="Review decision">
+          <button data-index="${index}" data-decision="approved">תקין</button>
+          <button data-index="${index}" data-decision="rejected">דחייה</button>
+          <button data-index="${index}" data-decision="pending" class="selected">ממתין</button>
+        </div>
       </article>`;
     })
     .join("\n");
@@ -166,14 +166,15 @@ function reviewHtml(manifest) {
 <style>
 body{margin:0;background:#f7f4ed;color:#101936;font-family:Arial,sans-serif;line-height:1.5}
 main{width:min(1100px,calc(100% - 28px));margin:32px auto}.intro,article{background:#fff;border:2px solid #101936;border-radius:14px;padding:18px;margin:0 0 24px;box-shadow:0 4px 0 #1019361a}
-h1,h2{margin:0 0 10px}.warning{border-right:5px solid #ff5a1f;padding:10px 14px;background:#fff1eb}
-article img{display:block;width:100%;height:auto;border:1px solid #bbb;background:white}
-ul{list-style:none;padding:0;margin:16px 0 0}li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:11px 0;border-top:1px solid #ddd;direction:ltr;text-align:left}
-.choices{display:flex;gap:7px;direction:rtl}button{padding:8px 12px;border:1px solid #101936;border-radius:8px;background:white;font-weight:700;cursor:pointer}button.selected[data-decision=approved]{background:#dff5e7;color:#17613b}button.selected[data-decision=rejected]{background:#ffe2db;color:#9c2f18}button.selected[data-decision=pending]{background:#eef0ff;color:#2853df}
+h1,h2,p{margin-top:0}.warning{border-right:5px solid #ff5a1f;padding:10px 14px;background:#fff1eb}
+article header{display:flex;justify-content:space-between;gap:18px;align-items:start}article header p{direction:ltr;text-align:left;color:#5d6171}
+.crop-image,.page-preview img{display:block;width:100%;height:auto;border:1px solid #bbb;background:white}.crop-image{max-height:78vh;object-fit:contain}
+details{margin-top:14px}summary{cursor:pointer;font-weight:700}.page-preview{position:relative;margin-top:10px}.highlight{position:absolute;border:4px solid #ff5a1f;background:#ff5a1f12;box-sizing:border-box;pointer-events:none}
+.choices{display:flex;gap:7px;direction:rtl;margin-top:16px;padding-top:14px;border-top:1px solid #ddd}button{padding:8px 12px;border:1px solid #101936;border-radius:8px;background:white;font-weight:700;cursor:pointer}button.selected[data-decision=approved]{background:#dff5e7;color:#17613b}button.selected[data-decision=rejected]{background:#ffe2db;color:#9c2f18}button.selected[data-decision=pending]{background:#eef0ff;color:#2853df}
 .download{position:sticky;bottom:12px;width:100%;margin-top:18px;padding:14px;background:#101936;color:white;font-size:17px}em{color:#a53016}
 </style></head><body><main>
 <section class="intro"><h1>בדיקת תמונות מקור — קורס ${escapeHtml(manifest.course)}</h1>
-<p class="warning"><strong>אל תאשרו לפי התמלול.</strong> בדקו שהעמוד שייך למבחן הנכון ושמספר השאלה המבוקש מופיע בו. התמונות הן עמודים מלאים בכוונה, כדי שאף חזקה, סימן או שורה לא ייחתכו.</p>
+<p class="warning"><strong>אל תאשרו לפי התמלול.</strong> בדקו שבתמונה מופיעה רק השאלה המתאימה, ושהמספר, הנוסחאות, האיורים וכל הסעיפים מלאים. פתחו את העמוד המלא כדי להשוות במקרה של ספק.</p>
 <p>סמנו כל שאלה, הורידו את קובץ ההחלטות, ואז הריצו <code>npm run review:crops -- ${escapeHtml(manifest.course)} --file PATH --publish</code>.</p></section>
 ${cards}
 <button class="download" id="download">הורדת קובץ החלטות</button>
@@ -181,6 +182,7 @@ ${cards}
 const manifest=${safeManifest};
 const decisions=manifest.questions.map(()=>"pending");
 document.addEventListener("click",event=>{const button=event.target.closest("button[data-index]");if(!button)return;const index=Number(button.dataset.index);decisions[index]=button.dataset.decision;button.parentElement.querySelectorAll("button").forEach(item=>item.classList.toggle("selected",item===button));});
+document.addEventListener("toggle",event=>{const details=event.target;if(!(details instanceof HTMLDetailsElement)||!details.open)return;const image=details.querySelector("img[data-full-src]");if(image&&!image.src)image.src=image.dataset.fullSrc;},true);
 document.getElementById("download").addEventListener("click",()=>{const output={course:manifest.course,generatedAt:new Date().toISOString(),questions:manifest.questions.map((question,index)=>({id:question.id,storagePath:question.storagePath,decision:decisions[index]}))};const blob=new Blob([JSON.stringify(output,null,2)],{type:"application/json"});const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="crop-decisions-"+manifest.course+".json";link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);});
 </script></body></html>`;
 }
@@ -252,7 +254,7 @@ async function main() {
 
   let questionQuery = supabase
     .from("questions")
-    .select("id,exam_id,ordinal,question_number,subpart,image_page,image_path")
+    .select("id,exam_id,ordinal,question_number,subpart,image_page,image_bbox,image_path")
     .in("exam_id", [...exams.keys()])
     .is("retired_at", null)
     .order("exam_id")
@@ -262,17 +264,23 @@ async function main() {
   if (questionResult.error) {
     throw new Error("Could not load source-image candidates: " + questionResult.error.message);
   }
-  const missingPage = (questionResult.data ?? []).filter(
+  const candidates = questionResult.data ?? [];
+  const missingPage = candidates.filter(
     (question) => !validPageNumber(question.image_page),
   );
-  let questions = (questionResult.data ?? []).filter((question) =>
-    validPageNumber(question.image_page),
+  const missingBox = candidates.filter(
+    (question) => validPageNumber(question.image_page) && !validFractionBox(question.image_bbox),
+  );
+  let questions = candidates.filter(
+    (question) =>
+      validPageNumber(question.image_page) && validFractionBox(question.image_bbox),
   );
   if (limit !== null) questions = questions.slice(0, limit);
 
   console.log(`Eligible questions: ${questions.length}`);
   console.log(`Questions missing a source page: ${missingPage.length}`);
-  console.log("Image mode: complete source page (safe default)");
+  console.log(`Questions missing a usable bounding box: ${missingBox.length}`);
+  console.log("Image mode: one padded crop per question");
   if (!questions.length) return;
   if (args["dry-run"]) {
     for (const question of questions) {
@@ -295,11 +303,12 @@ async function main() {
     version: 1,
     course,
     generatedAt: new Date().toISOString(),
-    mode: "full-page",
+    mode: "question-crop",
     questions: [],
   };
   let linked = 0;
   let renderedPageCount = 0;
+  let renderedCropCount = 0;
 
   for (const [examId, examGroups] of groupsByExam) {
     const exam = exams.get(examId);
@@ -327,59 +336,83 @@ async function main() {
       const page = await sharp(pageBuffer)
         .png({ compressionLevel: 9 })
         .toBuffer({ resolveWithObject: true });
-      const storagePath = pageStoragePath({
-        course,
+      const localPageImage = reviewImageName({
         examId,
         page: group.page,
         bytes: page.data,
       });
-      const localImage = reviewImageName({
-        examId,
-        page: group.page,
-        bytes: page.data,
-      });
-      await writeFile(path.join(reviewDirectory, localImage), page.data);
+      await writeFile(path.join(reviewDirectory, localPageImage), page.data);
       renderedPageCount += 1;
 
-      let pageUploaded = false;
-      if (!args["prepare-only"]) {
-        const upload = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, page.data, {
-            contentType: "image/png",
-            cacheControl: "31536000",
-            upsert: true,
-          });
-        if (upload.error) {
-          console.warn(`  upload failed for page ${group.page}: ${upload.error.message}`);
-        } else {
-          pageUploaded = true;
-        }
-      }
-
       for (const question of group.questions) {
+        const pixelBox = cropBoxToPixels(
+          question.image_bbox,
+          page.info.width,
+          page.info.height,
+        );
+        if (!pixelBox) {
+          console.warn(`  skipped ${question.id}: invalid crop after page rendering`);
+          continue;
+        }
+
+        let crop;
+        try {
+          crop = await sharp(page.data)
+            .extract(pixelBox)
+            .png({ compressionLevel: 9 })
+            .toBuffer({ resolveWithObject: true });
+        } catch (error) {
+          console.warn(`  skipped ${question.id}: ${error.message}`);
+          continue;
+        }
+        renderedCropCount += 1;
+        const storagePath = cropStoragePath({
+          course,
+          examId,
+          questionId: question.id,
+          page: group.page,
+          bytes: crop.data,
+        });
+        const localImage = reviewCropImageName({
+          questionId: question.id,
+          page: group.page,
+          bytes: crop.data,
+        });
+        await writeFile(path.join(reviewDirectory, localImage), crop.data);
+
         let questionLinked = false;
-        if (pageUploaded) {
-          const update = await supabase
-            .from("questions")
-            .update({
-              image_path: storagePath,
-              image_width: page.info.width,
-              image_height: page.info.height,
-              crop_review_status: "pending",
-              crop_reviewed_at: null,
-              crop_reviewed_by: null,
-              is_published: false,
-            })
-            .eq("id", question.id)
-            .select("id");
-          if (update.error) {
-            console.warn(`  uploaded but not linked ${question.id}: ${update.error.message}`);
-          } else if (update.data?.length !== 1) {
-            console.warn(`  uploaded but matched ${update.data?.length ?? 0} rows for ${question.id}`);
+        if (!args["prepare-only"]) {
+          const upload = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(storagePath, crop.data, {
+              contentType: "image/png",
+              cacheControl: "31536000",
+              upsert: true,
+            });
+          if (upload.error) {
+            console.warn(`  upload failed for ${question.id}: ${upload.error.message}`);
           } else {
-            questionLinked = true;
-            linked += 1;
+            const update = await supabase
+              .from("questions")
+              .update({
+                image_path: storagePath,
+                image_width: crop.info.width,
+                image_height: crop.info.height,
+                crop_review_status: "pending",
+                crop_reviewed_at: null,
+                crop_reviewed_by: null,
+                is_published: false,
+              })
+              .eq("id", question.id)
+              .select("id");
+            if (update.error) {
+              console.warn(`  uploaded but not linked ${question.id}: ${update.error.message}`);
+            } else if (update.data?.length !== 1) {
+              console.warn(`  uploaded but matched ${update.data?.length ?? 0} rows for ${question.id}`);
+            } else {
+              questionLinked = true;
+              linked += 1;
+            }
           }
         }
         manifest.questions.push({
@@ -389,15 +422,17 @@ async function main() {
           page: group.page,
           number: question.question_number,
           subpart: question.subpart ?? "",
+          bbox: question.image_bbox,
           storagePath,
           localImage,
+          localPageImage,
           linked: questionLinked,
           decision: "pending",
         });
       }
       console.log(
-        `  page ${group.page}: ${group.questions.length} question(s)` +
-          (args["prepare-only"] ? " prepared" : pageUploaded ? " linked as pending" : " not linked"),
+        `  page ${group.page}: ${group.questions.length} question crop(s)` +
+          (args["prepare-only"] ? " prepared" : " processed"),
       );
     }
   }
@@ -405,10 +440,11 @@ async function main() {
   await writeReviewBundle(reviewDirectory, manifest);
   console.log(`Review bundle: ${path.join(reviewDirectory, "index.html")}`);
   console.log(`Rendered ${renderedPageCount} page image(s).`);
+  console.log(`Rendered ${renderedCropCount} question crop(s).`);
   if (args["prepare-only"]) {
     console.log("Prepare-only completed. Supabase was not changed.");
   } else {
-    console.log(`Created and linked ${linked}/${questions.length} pending source image(s).`);
+    console.log(`Created and linked ${linked}/${questions.length} pending question crop(s).`);
     console.log("Nothing was published. Review the bundle, then use review:crops.");
   }
 }

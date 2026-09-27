@@ -1,12 +1,45 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  cropBoxToPixels,
+  cropStoragePath,
   groupByExamAndPage,
   pageStoragePath,
   parseReviewJson,
   reviewRows,
   validPageNumber,
 } from "../lib/crop-safety.mjs";
+
+test("question crop paths are unique, ASCII-safe and content-addressed", () => {
+  const result = cropStoragePath({
+    course: "80131",
+    examId: "80131:25a1",
+    questionId: "80131:25a1-2-א",
+    page: 2,
+    bytes: Buffer.from("question crop"),
+  });
+
+  assert.match(result, /^crops\/[A-Za-z0-9._/-]+\.png$/);
+  assert.ok(!result.includes(":"));
+  assert.ok(!result.includes("א"));
+});
+
+test("fractional boxes become padded, clamped pixel crops", () => {
+  assert.deepEqual(
+    cropBoxToPixels(
+      { x: 0.1, y: 0.2, w: 0.8, h: 0.3 },
+      1000,
+      2000,
+      { paddingX: 0, paddingY: 0 },
+    ),
+    { left: 100, top: 400, width: 800, height: 600 },
+  );
+  assert.deepEqual(
+    cropBoxToPixels({ x: 0, y: 0, w: 0.2, h: 0.1 }, 1000, 2000),
+    { left: 0, top: 0, width: 209, height: 220 },
+  );
+  assert.equal(cropBoxToPixels({ x: -1, y: 0, w: 1, h: 1 }, 1000, 2000), null);
+});
 
 test("source page paths are ASCII-safe and content-addressed", () => {
   const first = pageStoragePath({

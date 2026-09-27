@@ -57,6 +57,7 @@ export function QuestionCard({
   const hasApprovedImage = Boolean(
     question.imagePath && question.cropReviewStatus === "approved",
   );
+  const showsFullPage = Boolean(question.imagePath?.startsWith("pages/"));
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -116,7 +117,10 @@ export function QuestionCard({
             </div>
           ) : imageUrl ? (
             <figure className="question-scan">
-              <div className="question-scan-frame" ref={scanFrame}>
+              <div
+                className={`question-scan-frame ${showsFullPage ? "is-full-page" : "is-question-crop"}`}
+                ref={scanFrame}
+              >
                 <div className="question-scan-page">
                   <img
                     src={imageUrl}
@@ -124,9 +128,9 @@ export function QuestionCard({
                     width={question.imageWidth ?? undefined}
                     height={question.imageHeight ?? undefined}
                     loading="lazy"
-                    onLoad={positionSourcePage}
+                    onLoad={showsFullPage ? positionSourcePage : undefined}
                   />
-                  {question.imageBbox && (
+                  {showsFullPage && question.imageBbox && (
                     <span
                       className="question-scan-highlight"
                       aria-hidden="true"
@@ -141,7 +145,9 @@ export function QuestionCard({
                 </div>
               </div>
               <figcaption>
-                דף המקור המלא מוצג כדי לא לחתוך נוסחאות. המסגרת הכתומה היא סימון עזר אוטומטי בלבד.
+                {showsFullPage
+                  ? "דף המקור המלא מוצג. המסגרת הכתומה היא סימון עזר אוטומטי."
+                  : "חיתוך מתוך הסריקה המקורית, שנבדק ואושר לשאלה הזאת."}
               </figcaption>
               <span className="sr-only">{transcription}</span>
             </figure>
