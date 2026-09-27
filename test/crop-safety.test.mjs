@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  boundedQuestionCropBoxes,
   cropBoxToPixels,
   cropStoragePath,
   groupByExamAndPage,
@@ -9,6 +10,33 @@ import {
   reviewRows,
   validPageNumber,
 } from "../lib/crop-safety.mjs";
+
+test("neighbor boundaries produce non-overlapping complete-question slices", () => {
+  const boxes = boundedQuestionCropBoxes([
+    { id: "q1", exam_id: "exam", ordinal: 1, image_page: 2, image_bbox: { x: 0.2, y: 0.1, w: 0.6, h: 0.2 } },
+    { id: "q2", exam_id: "exam", ordinal: 2, image_page: 2, image_bbox: { x: 0.2, y: 0.35, w: 0.6, h: 0.2 } },
+    { id: "q3", exam_id: "exam", ordinal: 3, image_page: 2, image_bbox: { x: 0.2, y: 0.65, w: 0.6, h: 0.2 } },
+  ]);
+
+  assert.deepEqual(boxes.get("q1"), { x: 0.01, y: 0.04, w: 0.98, h: 0.285 });
+  assert.deepEqual(boxes.get("q2"), { x: 0.01, y: 0.325, w: 0.98, h: 0.275 });
+  assert.deepEqual(boxes.get("q3"), { x: 0.01, y: 0.6, w: 0.98, h: 0.31 });
+  assert.ok(
+    Math.abs(boxes.get("q1").y + boxes.get("q1").h - boxes.get("q2").y) < 1e-9,
+  );
+  assert.ok(
+    Math.abs(boxes.get("q2").y + boxes.get("q2").h - boxes.get("q3").y) < 1e-9,
+  );
+});
+
+test("an oversized box is cut before the next question starts", () => {
+  const boxes = boundedQuestionCropBoxes([
+    { id: "q1", exam_id: "exam", ordinal: 1, image_page: 1, image_bbox: { x: 0.1, y: 0.1, w: 0.8, h: 0.5 } },
+    { id: "q2", exam_id: "exam", ordinal: 2, image_page: 1, image_bbox: { x: 0.1, y: 0.4, w: 0.8, h: 0.3 } },
+  ]);
+  assert.equal(boxes.get("q1").y + boxes.get("q1").h, 0.375);
+  assert.equal(boxes.get("q2").y, 0.375);
+});
 
 test("question crop paths are unique, ASCII-safe and content-addressed", () => {
   const result = cropStoragePath({

@@ -8,6 +8,7 @@ import process from "node:process";
 import { pdf } from "pdf-to-img";
 import sharp from "sharp";
 import {
+  boundedQuestionCropBoxes,
   cropBoxToPixels,
   cropStoragePath,
   groupByExamAndPage,
@@ -271,10 +272,12 @@ async function main() {
   const missingBox = candidates.filter(
     (question) => validPageNumber(question.image_page) && !validFractionBox(question.image_bbox),
   );
-  let questions = candidates.filter(
+  const allQuestions = candidates.filter(
     (question) =>
       validPageNumber(question.image_page) && validFractionBox(question.image_bbox),
   );
+  const boundedBoxes = boundedQuestionCropBoxes(allQuestions);
+  let questions = allQuestions;
   if (limit !== null) questions = questions.slice(0, limit);
 
   console.log(`Eligible questions: ${questions.length}`);
@@ -345,10 +348,12 @@ async function main() {
       renderedPageCount += 1;
 
       for (const question of group.questions) {
+        const cropBox = boundedBoxes.get(question.id) ?? question.image_bbox;
         const pixelBox = cropBoxToPixels(
-          question.image_bbox,
+          cropBox,
           page.info.width,
           page.info.height,
+          { paddingX: 0, paddingY: 0 },
         );
         if (!pixelBox) {
           console.warn(`  skipped ${question.id}: invalid crop after page rendering`);
@@ -422,7 +427,8 @@ async function main() {
           page: group.page,
           number: question.question_number,
           subpart: question.subpart ?? "",
-          bbox: question.image_bbox,
+          bbox: cropBox,
+          sourceBbox: question.image_bbox,
           storagePath,
           localImage,
           localPageImage,
