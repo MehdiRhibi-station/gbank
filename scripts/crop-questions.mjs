@@ -31,6 +31,7 @@ Usage:
 Options:
   --pdf-dir PATH      Folder containing source PDFs (Storage is the fallback)
   --review-dir PATH   Local review bundle (default: crop-review/COURSE)
+  --exam ID_OR_FILE  Process only one exam id or PDF filename
   --scale NUMBER      PDF render scale, 1–6 (default: 3)
   --limit NUMBER      Process only the first NUMBER questions
   --force             Replace existing images and reset their review status
@@ -50,7 +51,7 @@ Safety model:
 function parseArgs(argv) {
   const args = {};
   const flags = new Set(["dry-run", "force", "prepare-only", "help"]);
-  const values = new Set(["pdf-dir", "review-dir", "scale", "limit"]);
+  const values = new Set(["pdf-dir", "review-dir", "exam", "scale", "limit"]);
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (!value.startsWith("--")) {
@@ -180,7 +181,7 @@ main{width:min(1100px,calc(100% - 28px));margin:32px auto}.intro,article{backgro
 h1,h2,p{margin-top:0}.warning{border-right:5px solid #ff5a1f;padding:10px 14px;background:#fff1eb}
 article header{display:flex;justify-content:space-between;gap:18px;align-items:start}article header p{direction:ltr;text-align:left;color:#5d6171}
 .crop-tools{display:flex;align-items:center;gap:8px;direction:rtl;margin:8px 0}.crop-tools a{margin-right:auto;color:#2853df;font-weight:700}.crop-tools span{min-width:48px;text-align:center;font-weight:700}
-.crop-viewport{max-height:85vh;overflow:auto;border:1px solid #bbb;background:white}.crop-image{display:block;width:100%;max-width:none;height:auto;background:white}.page-preview img{display:block;width:100%;height:auto;border:1px solid #bbb;background:white}
+.crop-viewport{overflow-x:auto;overflow-y:visible;border:1px solid #bbb;background:white}.crop-image{display:block;width:100%;max-width:none;height:auto;background:white}.page-preview img{display:block;width:100%;height:auto;border:1px solid #bbb;background:white}
 details{margin-top:14px}summary{cursor:pointer;font-weight:700}.page-preview{position:relative;margin-top:10px}.highlight{position:absolute;border:4px solid #ff5a1f;background:#ff5a1f12;box-sizing:border-box;pointer-events:none}
 .choices{display:flex;gap:7px;direction:rtl;margin-top:16px;padding-top:14px;border-top:1px solid #ddd}button{padding:8px 12px;border:1px solid #101936;border-radius:8px;background:white;font-weight:700;cursor:pointer}button.selected[data-decision=approved]{background:#dff5e7;color:#17613b}button.selected[data-decision=rejected]{background:#ffe2db;color:#9c2f18}button.selected[data-decision=pending]{background:#eef0ff;color:#2853df}
 .download{position:sticky;bottom:12px;width:100%;margin-top:18px;padding:14px;background:#101936;color:white;font-size:17px}em{color:#a53016}
@@ -263,6 +264,21 @@ async function main() {
   if (examResult.error) throw new Error("Could not load exams: " + examResult.error.message);
   const exams = new Map((examResult.data ?? []).map((exam) => [exam.id, exam]));
   if (!exams.size) throw new Error("No database exams found for course " + course);
+  let selectedExamIds = null;
+  if (args.exam) {
+    const needle = String(args.exam).toLocaleLowerCase();
+    selectedExamIds = new Set(
+      [...exams.entries()]
+        .filter(([id, exam]) => {
+          const filename = String(exam.source_filename ?? "");
+          return String(id).toLocaleLowerCase() === needle ||
+            filename.toLocaleLowerCase() === needle ||
+            path.basename(filename, path.extname(filename)).toLocaleLowerCase() === needle;
+        })
+        .map(([id]) => id),
+    );
+    if (!selectedExamIds.size) throw new Error(`No exam matched --exam ${args.exam}`);
+  }
 
   let questionQuery = supabase
     .from("questions")
@@ -276,7 +292,9 @@ async function main() {
   if (questionResult.error) {
     throw new Error("Could not load source-image candidates: " + questionResult.error.message);
   }
-  const candidates = questionResult.data ?? [];
+  const candidates = (questionResult.data ?? []).filter(
+    (question) => !selectedExamIds || selectedExamIds.has(question.exam_id),
+  );
   const missingPage = candidates.filter(
     (question) => !validPageNumber(question.image_page),
   );
