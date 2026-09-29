@@ -3,8 +3,8 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "גיבנק — בנק שאלות למבחנים",
-  description: "חיפוש חכם במבחנים, רמזים והתקדמות אישית לסטודנטים באוניברסיטה העברית.",
+  title: "תודל — בנק שאלות למבחנים",
+  description: "תודל מרכז שאלות ממבחנים, רמזים והתקדמות אישית לסטודנטים באוניברסיטה העברית.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { User } from "@supabase/supabase-js";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MoonIcon, SearchIcon, SunIcon, UploadIcon } from "@/components/icons";
 import { QuestionCard } from "@/components/question-card";
@@ -620,11 +621,13 @@ export function BankApp() {
     <div className="site-shell">
       <header className="masthead">
         <div className="masthead-inner">
-          <button className="brand" type="button" onClick={goHome} aria-label="דף הבית של גיבנק">
-            <span className="brand-mark">ג׳</span>
+          <button className="brand" type="button" onClick={goHome} aria-label="דף הבית של תודל">
+            <span className="brand-mark" aria-hidden="true">
+              <Image src="/toodle-logo.png" alt="" width={48} height={48} priority />
+            </span>
             <span>
-              <strong>גיבנק</strong>
-              <small>שאלות · רמזים · התקדמות</small>
+              <strong>תודל</strong>
+              <small>TOODLE · שאלות · רמזים</small>
             </span>
           </button>
 
@@ -665,7 +668,7 @@ export function BankApp() {
             <div className="hero-orb orb-one" />
             <div className="hero-orb orb-two" />
             <div className="container hero-content">
-              <span className="eyebrow orange">בנק תרגול חכם לסטודנטים</span>
+              <span className="eyebrow orange">תודל · בנק תרגול חכם לסטודנטים</span>
               <h1>פחות זמן לחפש.<br />יותר זמן לפתור.</h1>
               <p>
                 כל שאלות המבחנים במקום אחד — מסודרות לפי נושא, סוג שאלה, מרצה, שנה ומועד.
@@ -732,7 +735,7 @@ export function BankApp() {
               {courseHits.length === 0 && (
                 <div className="empty-state">
                   <strong>הקורס הזה עדיין לא במאגר</strong>
-                  <p>אפשר להוסיף אותו דרך תהליך הייבוא המסודר של גיבנק.</p>
+                  <p>אפשר להוסיף אותו דרך תהליך הייבוא המסודר של תודל.</p>
                 </div>
               )}
             </div>
@@ -918,7 +921,10 @@ export function BankApp() {
 
       <footer>
         <div className="container footer-inner">
-          <strong>גיבנק</strong>
+          <div className="footer-brand">
+            <Image src="/toodle-logo.png" alt="" width={42} height={42} aria-hidden="true" />
+            <strong>תודל</strong>
+          </div>
           <p>כל הזכויות על השאלות שמורות לאוניברסיטה העברית ולסגלי הקורסים.</p>
           <span>הרמזים נכתבים על ידי סטודנטים — קראו בעין ביקורתית.</span>
         </div>
@@ -938,7 +944,7 @@ export function BankApp() {
       )}
 
       {authOpen && (
-        <Modal title={user ? "החשבון שלי" : "כניסה לגיבנק"} onClose={() => setAuthOpen(false)}>
+        <Modal title={user ? "החשבון שלי" : "כניסה לתודל"} onClose={() => setAuthOpen(false)}>
           {user ? (
             <div className="auth-copy">
               <span className="eyebrow">מחובר/ת</span>
