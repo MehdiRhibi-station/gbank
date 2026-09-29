@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckIcon, FileIcon, HeartIcon } from "@/components/icons";
 import type { Exam, Hint, Progress, Question, QuestionStats } from "@/lib/types";
 
@@ -24,6 +24,7 @@ interface QuestionCardProps {
   stats: QuestionStats;
   progress: Progress;
   hints: Hint[];
+  imageUrl: string | null | undefined;
   onToggleLiked: () => void;
   onToggleSolved: () => void;
   onOpenHints: () => void;
@@ -40,6 +41,7 @@ export function QuestionCard({
   stats,
   progress,
   hints,
+  imageUrl,
   onToggleLiked,
   onToggleSolved,
   onOpenHints,
@@ -50,6 +52,12 @@ export function QuestionCard({
   const [hintsOpen, setHintsOpen] = useState(false);
   const [hintText, setHintText] = useState("");
   const [posting, setPosting] = useState(false);
+  const scanFrame = useRef<HTMLDivElement>(null);
+  const transcription = [question.context, question.statement].filter(Boolean).join("\n");
+  const hasApprovedImage = Boolean(
+    question.imagePath && question.cropReviewStatus === "approved",
+  );
+  const showsFullPage = Boolean(question.imagePath?.startsWith("pages/"));
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -73,6 +81,15 @@ export function QuestionCard({
     if (next) onOpenHints();
   }
 
+  function positionSourcePage() {
+    const frame = scanFrame.current;
+    const box = question.imageBbox;
+    if (!frame || !box) return;
+    window.requestAnimationFrame(() => {
+      frame.scrollTop = Math.max(0, box.y * frame.scrollHeight - 36);
+    });
+  }
+
   return (
     <article className={`question-card ${progress.solved ? "is-solved" : ""}`}>
       <div className="question-index" aria-label={`שאלה ${question.number}${question.subpart}`}>
@@ -93,8 +110,67 @@ export function QuestionCard({
         </div>
 
         <h2>{question.title}</h2>
-        {question.context && <p className="question-context">{question.context}</p>}
-        <p className="question-statement">{question.statement}</p>
+        {hasApprovedImage ? (
+          imageUrl === undefined ? (
+            <div className="question-scan-loading" role="status">
+              טוען את סריקת המקור…
+            </div>
+          ) : imageUrl ? (
+            <figure className="question-scan">
+              <div
+                className={`question-scan-frame ${showsFullPage ? "is-full-page" : "is-question-crop"}`}
+                ref={scanFrame}
+              >
+                <div className="question-scan-page">
+                  <img
+                    src={imageUrl}
+                    alt={transcription}
+                    width={question.imageWidth ?? undefined}
+                    height={question.imageHeight ?? undefined}
+                    loading="lazy"
+                    onLoad={showsFullPage ? positionSourcePage : undefined}
+                  />
+                  {showsFullPage && question.imageBbox && (
+                    <span
+                      className="question-scan-highlight"
+                      aria-hidden="true"
+                      style={{
+                        left: `${question.imageBbox.x * 100}%`,
+                        top: `${question.imageBbox.y * 100}%`,
+                        width: `${question.imageBbox.w * 100}%`,
+                        height: `${question.imageBbox.h * 100}%`,
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+              <figcaption>
+                {showsFullPage
+                  ? "דף המקור המלא מוצג. המסגרת הכתומה היא סימון עזר אוטומטי."
+                  : "חיתוך מתוך הסריקה המקורית, שנבדק ואושר לשאלה הזאת."}
+              </figcaption>
+              <span className="sr-only">{transcription}</span>
+            </figure>
+          ) : (
+            <div className="question-text-fallback">
+              <p className="question-source-notice">
+                סריקת המקור אינה זמינה כרגע. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות.
+              </p>
+              {question.context && <p className="question-context">{question.context}</p>}
+              <p className="question-statement">{question.statement}</p>
+            </div>
+          )
+        ) : (
+          <div className="question-text-fallback">
+            <p className="question-source-notice">
+              {question.imagePath
+                ? "תמונת המקור עדיין לא אושרה ולכן אינה מוצגת. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות."
+                : "לשאלה הזאת עדיין אין תמונת מקור. הנוסח הבא חולץ אוטומטית ועלול להכיל שגיאות."}
+            </p>
+            {question.context && <p className="question-context">{question.context}</p>}
+            <p className="question-statement">{question.statement}</p>
+          </div>
+        )}
 
         <div className="question-footer">
           <div className="topic-list">

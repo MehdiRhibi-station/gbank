@@ -9,6 +9,7 @@ out/
 .DS_Store
 imports/
 downloads/
+crop-review/
 __pycache__/
 *.py[cod]
 .venv/
