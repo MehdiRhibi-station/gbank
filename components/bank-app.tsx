@@ -623,7 +623,7 @@ export function BankApp() {
         <div className="masthead-inner">
           <button className="brand" type="button" onClick={goHome} aria-label="דף הבית של תודל">
             <span className="brand-mark" aria-hidden="true">
-              <Image src="/toodle-logo.png" alt="" width={48} height={48} priority />
+              <Image src="/toodle-logo.webp" alt="" width={48} height={48} priority />
             </span>
             <span>
               <strong>תודל</strong>
@@ -922,7 +922,7 @@ export function BankApp() {
       <footer>
         <div className="container footer-inner">
           <div className="footer-brand">
-            <Image src="/toodle-logo.png" alt="" width={42} height={42} aria-hidden="true" />
+            <Image src="/toodle-logo.webp" alt="" width={42} height={42} aria-hidden="true" />
             <strong>תודל</strong>
           </div>
           <p>כל הזכויות על השאלות שמורות לאוניברסיטה העברית ולסגלי הקורסים.</p>
