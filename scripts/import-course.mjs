@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { collapseDuplicateExamQuestions } from "../lib/import-questions.mjs";
 import { groupCourseDraft } from "../lib/question-groups.mjs";
 
 function usage() {
@@ -329,23 +330,37 @@ async function main() {
     console.log(`Uploaded ${item.exam.file}`);
   }
 
-  const questionRows = data.questions.map((question) => ({
-    id: prefixedId(courseNumber, question.id),
-    exam_id: sourceIdToExamId.get(question.ex) ?? prefixedId(courseNumber, question.ex),
-    ordinal: question.o,
-    question_number: question.q,
-    subpart: question.s ?? "",
-    points: question.pts ?? "",
-    nature: question.nat,
-    difficulty: question.lvl,
-    topics: question.top ?? [],
-    title: question.title,
-    context: question.ctx ?? null,
-    statement: question.st,
-    uncertain: Boolean(question.unc),
-    extractor: question.extractor ?? data.extractor ?? null,
-    retired_at: null,
+  const collapsedQuestions = collapseDuplicateExamQuestions(
+    data.questions,
+    (sourceId) => sourceIdToExamId.get(sourceId) ?? prefixedId(courseNumber, sourceId),
+  );
+  if (collapsedQuestions.collisions.length) {
+    console.log(
+      `Collapsed ${collapsedQuestions.collisions.length} duplicate question row(s) ` +
+        "from byte-identical exam PDFs.",
+    );
+  }
+  const questionImports = collapsedQuestions.items.map((item) => ({
+    question: item.question,
+    row: {
+      id: prefixedId(courseNumber, item.question.id),
+      exam_id: item.examId,
+      ordinal: item.question.o,
+      question_number: item.questionNumber,
+      subpart: item.subpart,
+      points: item.question.pts ?? "",
+      nature: item.question.nat,
+      difficulty: item.question.lvl,
+      topics: item.question.top ?? [],
+      title: item.question.title,
+      context: item.question.ctx ?? null,
+      statement: item.question.st,
+      uncertain: Boolean(item.question.unc),
+      extractor: item.question.extractor ?? data.extractor ?? null,
+      retired_at: null,
+    },
   }));
+  const questionRows = questionImports.map((item) => item.row);
   for (const batch of chunks(questionRows, 500)) {
     await upsertOrThrow(
       supabase.from("questions").upsert(batch, {
@@ -358,19 +373,18 @@ async function main() {
   // Verification status is intentionally never accepted from JSON. It can
   // only be changed by mark_verified(). Image metadata is updated separately
   // so an older text-only draft cannot erase a crop that is already in use.
-  for (const question of data.questions) {
+  for (const { question, row } of questionImports) {
     if (!question.imagePage || !question.imageBbox) continue;
     const update = {
       image_page: question.imagePage,
       image_bbox: question.imageBbox,
     };
-    const examId = sourceIdToExamId.get(question.ex) ?? prefixedId(courseNumber, question.ex);
     const result = await supabase
       .from("questions")
       .update(update)
-      .eq("exam_id", examId)
-      .eq("question_number", question.q)
-      .eq("subpart", question.s ?? "")
+      .eq("exam_id", row.exam_id)
+      .eq("question_number", row.question_number)
+      .eq("subpart", row.subpart)
       .select("id");
     if (result.error) {
       throw new Error(`Question image metadata failed for ${question.id}: ${result.error.message}`);

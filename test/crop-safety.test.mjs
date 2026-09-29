@@ -19,9 +19,9 @@ test("neighbor boundaries produce non-overlapping complete-question slices", () 
     { id: "q3", exam_id: "exam", ordinal: 3, image_page: 2, image_bbox: { x: 0.2, y: 0.65, w: 0.6, h: 0.2 } },
   ]);
 
-  assert.deepEqual(boxes.get("q1"), { x: 0.01, y: 0, w: 0.98, h: 0.332 });
-  assert.deepEqual(boxes.get("q2"), { x: 0.01, y: 0.332, w: 0.98, h: 0.3 });
-  assert.deepEqual(boxes.get("q3"), { x: 0.01, y: 0.632, w: 0.98, h: 0.358 });
+  assert.deepEqual(boxes.get("q1"), { x: 0.01, y: 0, w: 0.98, h: 0.346 });
+  assert.deepEqual(boxes.get("q2"), { x: 0.01, y: 0.346, w: 0.98, h: 0.3 });
+  assert.deepEqual(boxes.get("q3"), { x: 0.01, y: 0.646, w: 0.98, h: 0.344 });
   assert.ok(
     Math.abs(boxes.get("q1").y + boxes.get("q1").h - boxes.get("q2").y) < 1e-9,
   );
@@ -35,8 +35,8 @@ test("an oversized box is cut before the next question starts", () => {
     { id: "q1", exam_id: "exam", ordinal: 1, image_page: 1, image_bbox: { x: 0.1, y: 0.1, w: 0.8, h: 0.5 } },
     { id: "q2", exam_id: "exam", ordinal: 2, image_page: 1, image_bbox: { x: 0.1, y: 0.4, w: 0.8, h: 0.3 } },
   ]);
-  assert.equal(boxes.get("q1").y + boxes.get("q1").h, 0.382);
-  assert.equal(boxes.get("q2").y, 0.382);
+  assert.equal(boxes.get("q1").y + boxes.get("q1").h, 0.396);
+  assert.equal(boxes.get("q2").y, 0.396);
 });
 
 test("outside whitespace is removed without cutting content or internal gaps", () => {
@@ -52,8 +52,21 @@ test("outside whitespace is removed without cutting content or internal gaps", (
     left: 0,
     top: 22,
     width: 100,
-    height: 46,
+    height: 58,
   });
+});
+
+test("content trimming keeps extra room below the final formula row", () => {
+  const width = 100;
+  const height = 1000;
+  const pixels = new Uint8Array(width * height).fill(255);
+  for (let y = 400; y < 500; y += 1) {
+    for (let x = 20; x < 80; x += 1) pixels[y * width + x] = 0;
+  }
+
+  const crop = paddedVerticalInkCrop(pixels, width, height);
+  assert.equal(crop.top, 375);
+  assert.equal(crop.height, 170);
 });
 
 test("question crop paths are unique, ASCII-safe and content-addressed", () => {
