@@ -8,6 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build",
+    "course:update": "node scripts/course-update.mjs",
     "import:course": "node scripts/import-course.mjs",
     "fetch:exams": "node scripts/fetch-exams.mjs",
     "crop:questions": "node scripts/crop-questions.mjs",
@@ -28,6 +29,7 @@
     "sharp": "^0.35.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

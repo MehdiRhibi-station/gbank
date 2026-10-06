@@ -2,11 +2,13 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pdf } from "pdf-to-img";
 import sharp from "sharp";
+import { allRows, requireStaging } from "../lib/pipeline-db.mjs";
+import { reviewPersistenceScript } from "../lib/review-state.mjs";
 import {
   boundedQuestionCropBoxes,
   cropBoxToPixels,
@@ -34,7 +36,7 @@ Options:
   --exam ID_OR_FILE  Process only one exam id or PDF filename
   --scale NUMBER      PDF render scale, 1–6 (default: 3)
   --limit NUMBER      Process only the first NUMBER questions
-  --force             Replace existing images and reset their review status
+  --force             Rebuild candidate images (live images remain untouched)
   --prepare-only      Render the review bundle without uploading or changing DB
   --dry-run           List eligible questions without rendering or uploading
   --help              Show this help
@@ -43,8 +45,8 @@ Safety model:
   Machine coordinates are padded and converted to a separate image for each
   question. Missing or invalid boxes are skipped and remain unpublished. The
   local review bundle shows each crop beside an optional complete-page view.
-  Every linked crop remains unpublished and pending until review:crops approves
-  that exact storage path.
+  Replacements are staged privately until review:crops approves and publishes
+  that exact storage path. Existing published questions stay live.
 `);
 }
 
@@ -190,23 +192,26 @@ details{margin-top:14px}summary{cursor:pointer;font-weight:700}.page-preview{pos
 <p class="warning"><strong>אל תאשרו לפי התמלול.</strong> בדקו שבתמונה מופיעה רק השאלה המתאימה, ושהמספר, הנוסחאות, האיורים וכל הסעיפים מלאים. פתחו את העמוד המלא כדי להשוות במקרה של ספק.</p>
 <p>סמנו כל שאלה, הורידו את קובץ ההחלטות, ואז הריצו <code>npm run review:crops -- ${escapeHtml(manifest.course)} --file PATH --publish</code>.</p></section>
 ${cards}
+<p id="save-status">Decisions are remembered in this browser for these exact images. Download to publish.</p>
 <button class="download" id="download">הורדת קובץ החלטות</button>
 </main><script>
 const manifest=${safeManifest};
-const decisions=manifest.questions.map(()=>"pending");
 document.addEventListener("click",event=>{const zoom=event.target.closest("button[data-zoom],button[data-zoom-reset]");if(zoom){const article=zoom.closest("article");const image=article.querySelector(".crop-image");const label=article.querySelector("[data-zoom-label]");const current=Number(image.dataset.zoom||100);const next=zoom.hasAttribute("data-zoom-reset")?100:Math.max(50,Math.min(250,current+Number(zoom.dataset.zoom)));image.dataset.zoom=String(next);image.style.width=next+"%";label.textContent=next+"%";return;}const button=event.target.closest("button[data-index]");if(!button)return;const index=Number(button.dataset.index);decisions[index]=button.dataset.decision;button.parentElement.querySelectorAll("button").forEach(item=>item.classList.toggle("selected",item===button));});
 document.addEventListener("toggle",event=>{const details=event.target;if(!(details instanceof HTMLDetailsElement)||!details.open)return;const image=details.querySelector("img[data-full-src]");if(image&&!image.src)image.src=image.dataset.fullSrc;},true);
 document.getElementById("download").addEventListener("click",()=>{const output={course:manifest.course,generatedAt:new Date().toISOString(),questions:manifest.questions.map((question,index)=>({id:question.id,storagePath:question.storagePath,decision:decisions[index]}))};const blob=new Blob([JSON.stringify(output,null,2)],{type:"application/json"});const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="crop-decisions-"+manifest.course+".json";link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);});
+${reviewPersistenceScript()}
 </script></body></html>`;
 }
 
 async function writeReviewBundle(reviewDirectory, manifest) {
   await mkdir(reviewDirectory, { recursive: true });
   await writeFile(
-    path.join(reviewDirectory, "review-manifest.json"),
+    path.join(reviewDirectory, "review-manifest.json.tmp"),
     JSON.stringify(manifest, null, 2) + "\n",
   );
-  await writeFile(path.join(reviewDirectory, "index.html"), reviewHtml(manifest));
+  await rename(path.join(reviewDirectory, "review-manifest.json.tmp"), path.join(reviewDirectory, "review-manifest.json"));
+  await writeFile(path.join(reviewDirectory, "index.html.tmp"), reviewHtml(manifest));
+  await rename(path.join(reviewDirectory, "index.html.tmp"), path.join(reviewDirectory, "index.html"));
 }
 
 async function main() {
@@ -246,16 +251,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const migrationProbe = await supabase
-    .from("questions")
-    .select("crop_review_status")
-    .limit(1);
-  if (migrationProbe.error) {
-    throw new Error(
-      "Apply supabase/migrations/202609270005_crop_review.sql before regenerating images: " +
-        migrationProbe.error.message,
-    );
-  }
+  await requireStaging(supabase);
 
   const examResult = await supabase
     .from("exams")
@@ -280,19 +276,23 @@ async function main() {
     if (!selectedExamIds.size) throw new Error(`No exam matched --exam ${args.exam}`);
   }
 
-  let questionQuery = supabase
+  const liveRows = await allRows(() => supabase
     .from("questions")
-    .select("id,exam_id,ordinal,question_number,subpart,image_page,image_bbox,image_path")
+    .select("id,exam_id,ordinal,question_number,subpart,image_page,image_bbox,image_path,is_published,retired_at")
     .in("exam_id", [...exams.keys()])
-    .is("retired_at", null)
-    .order("exam_id")
-    .order("ordinal");
-  if (!args.force) questionQuery = questionQuery.is("image_path", null);
-  const questionResult = await questionQuery;
-  if (questionResult.error) {
-    throw new Error("Could not load source-image candidates: " + questionResult.error.message);
+    .order("id"));
+  const updates = [];
+  for (let offset = 0; offset < liveRows.length; offset += 200) {
+    updates.push(...await allRows(() => supabase.from("question_updates").select("*")
+      .in("question_id", liveRows.slice(offset, offset + 200).map(q => q.id)).order("question_id")));
   }
-  const candidates = (questionResult.data ?? []).filter(
+  const byId = new Map(updates.map(row => [row.question_id, row]));
+  const candidates = liveRows.filter(q => byId.has(q.id)).map(q => {
+    const update = byId.get(q.id);
+    return { ...q, ...update.draft, id: q.id, revision: update.revision,
+      liveImage: q.image_path, livePublished: q.is_published && !q.retired_at,
+      candidateImage: update.image_path, candidateStatus: update.review_status };
+  }).filter(
     (question) => !selectedExamIds || selectedExamIds.has(question.exam_id),
   );
   const missingPage = candidates.filter(
@@ -306,14 +306,22 @@ async function main() {
       validPageNumber(question.image_page) && validFractionBox(question.image_bbox),
   );
   const boundedBoxes = boundedQuestionCropBoxes(allQuestions);
-  let questions = allQuestions;
+  let questions = allQuestions.filter(q => args.force ||
+    (q.candidateStatus !== "rejected" && !(q.candidateStatus === "approved" &&
+      q.candidateImage === q.liveImage && q.livePublished)));
   if (limit !== null) questions = questions.slice(0, limit);
 
   console.log(`Eligible questions: ${questions.length}`);
   console.log(`Questions missing a source page: ${missingPage.length}`);
   console.log(`Questions missing a usable bounding box: ${missingBox.length}`);
   console.log("Image mode: one padded crop per question");
-  if (!questions.length) return;
+  if (!questions.length) {
+    console.log("No pending usable candidates. Import the repaired draft first, or inspect blocked/rejected rows.");
+    if (!args["dry-run"]) await writeReviewBundle(reviewDirectory, {
+      version: 1, course, generatedAt: new Date().toISOString(), mode: "question-crop", questions: [],
+    });
+    return;
+  }
   if (args["dry-run"]) {
     for (const question of questions) {
       console.log(`  ${question.id}: ${question.exam_id}, page ${question.image_page}`);
@@ -419,7 +427,7 @@ async function main() {
         const storagePath = cropStoragePath({
           course,
           examId,
-          questionId: question.id,
+          questionId: `${question.id}-${question.revision}`,
           page: group.page,
           bytes: crop.data,
         });
@@ -442,23 +450,12 @@ async function main() {
           if (upload.error) {
             console.warn(`  upload failed for ${question.id}: ${upload.error.message}`);
           } else {
-            const update = await supabase
-              .from("questions")
-              .update({
-                image_path: storagePath,
-                image_width: crop.info.width,
-                image_height: crop.info.height,
-                crop_review_status: "pending",
-                crop_reviewed_at: null,
-                crop_reviewed_by: null,
-                is_published: false,
-              })
-              .eq("id", question.id)
-              .select("id");
+            const update = await supabase.rpc("stage_question_crop", {
+              p_question_id: question.id, p_revision: question.revision,
+              p_path: storagePath, p_width: crop.info.width, p_height: crop.info.height,
+            });
             if (update.error) {
               console.warn(`  uploaded but not linked ${question.id}: ${update.error.message}`);
-            } else if (update.data?.length !== 1) {
-              console.warn(`  uploaded but matched ${update.data?.length ?? 0} rows for ${question.id}`);
             } else {
               questionLinked = true;
               linked += 1;
@@ -480,6 +477,8 @@ async function main() {
           linked: questionLinked,
           decision: "pending",
         });
+        // Keep reviewable work even if a later page or network request fails.
+        await writeReviewBundle(reviewDirectory, manifest);
       }
       console.log(
         `  page ${group.page}: ${group.questions.length} question crop(s)` +
@@ -497,6 +496,9 @@ async function main() {
   } else {
     console.log(`Created and linked ${linked}/${questions.length} pending question crop(s).`);
     console.log("Nothing was published. Review the bundle, then use review:crops.");
+    if (linked !== questions.length) {
+      throw new Error("Some crops failed. Saved review work was kept; rerun the same command to retry.");
+    }
   }
 }
 

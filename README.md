@@ -1,5 +1,29 @@
 # תודל (Toodle)
 
+## Smooth course updates (owner only)
+
+Use the unified updater instead of copying paths between six scripts. Apply
+`supabase/migrations/202610060006_staged_updates.sql` once after the existing
+migrations, then run `npm install` and:
+
+```powershell
+npm run course:update -- 80181 --from 2016 --course-name "מתמטיקה דיסקרטית"
+```
+
+The command resumes downloads/extraction, groups whole questions, repairs boxes,
+stages drafts, and opens the crop review. Review and download your decisions, then:
+
+```powershell
+npm run course:update -- 80181 --publish
+```
+
+Existing approved questions stay live while replacements are prepared. Rejected
+replacements do not hide them. Partial-year imports no longer retire other years.
+Review choices persist in the same browser for the same images.
+
+See [the update guide](docs/course-update.md) for migration setup, resume/status,
+quota errors, explicit review files, and the older-script compatibility change.
+
 בנק שאלות למבחני האוניברסיטה העברית: חיפוש לפי נושא ואופי השאלה, רמזים מהקהילה,
 שמירת התקדמות וצפייה בסריקות המקור. הפרויקט מגיע עם 117 שאלות מ-18 מבחנים בשני
 קורסים: אינפי 1 ותורת ההסתברות 1.
