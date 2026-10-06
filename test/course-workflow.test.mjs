@@ -71,3 +71,9 @@ test('database reads include courses exceeding the default response cap', async 
   assert.equal(result.length,1201);
   await assert.rejects(allRows(() => ({range:async()=>({error:{message:'offline'}})})),/offline/);
 });
+
+test('owner publication requires an explicit, exclusive flag', () => {
+  assert.equal(parseUpdateArgs(['80181','--publish-unreviewed'])['publish-unreviewed'],true);
+  for (const flag of ['--publish','--status','--file'])
+    assert.throws(() => parseUpdateArgs(['80181','--publish-unreviewed',flag,'path'].slice(0, flag === '--file' ? 4 : 3)));
+});

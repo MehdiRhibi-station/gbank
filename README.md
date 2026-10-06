@@ -302,3 +302,11 @@ legacy/                 The original one-file prototype and extraction tools
 
 השאלות נכתבו בידי סגלי הקורסים והזכויות עליהן שמורות לאוניברסיטה העברית. לפני
 פרסום רחב של סריקות מלאות, ודאו שקיבלתם הרשאה מתאימה. גיבנק מציג רמזים ולא פתרונות מלאים.
+
+### Owner publication without individual review
+
+After applying `supabase/migrations/202610060007_owner_unreviewed.sql` and deploying
+this frontend, run `npm run course:update -- 80181 --publish-unreviewed`.
+This explicitly publishes available pending crops without Gemini calls or approval
+files. Missing or rejected crops are skipped. Images carry an unreviewed notice;
+no human approval is fabricated. See [the updater guide](docs/course-update.md).

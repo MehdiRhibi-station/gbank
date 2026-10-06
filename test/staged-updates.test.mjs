@@ -14,7 +14,7 @@ test('staged updates preserve live content, reject stale reviews, and promote at
       create table storage.objects(id text,bucket_id text);`);
     for (const name of ['202609210001_initial_gbank.sql','202609260002_safe_imports.sql',
       '202609260003_pipeline_integrity.sql','202609260004_image_first.sql',
-      '202609270005_crop_review.sql','202610060006_staged_updates.sql']) {
+      '202609270005_crop_review.sql','202610060006_staged_updates.sql','202610060007_owner_unreviewed.sql']) {
       const sql = await readFile(new URL(`../supabase/migrations/${name}`, import.meta.url), 'utf8');
       // gen_random_uuid is built into PostgreSQL; no other pgcrypto functions are used.
       await db.exec(sql.replace('create extension if not exists pgcrypto;', ''));
@@ -76,9 +76,34 @@ test('staged updates preserve live content, reject stale reviews, and promote at
     assert.equal((await live()).image_path,'crops/second.png');
     assert.equal((await live()).is_published,true);
     assert.equal((await pending()).review_status,'pending');
+    await db.exec(`update public.courses set text_is_source=false where number='80181'`);
+    const publishOwner = async (name, revision) => db.query(
+      'select public.publish_question_update_unreviewed($1,$2,$3) as published', ['q1',name,revision]);
+    const third = await pending();
+    await assert.rejects(publishOwner('crops/third.png', first.revision), /Stale review/);
+    assert.equal((await publishOwner('crops/third.png',third.revision)).rows[0].published,true);
+    assert.equal((await live()).is_published,true);
+    assert.equal((await live()).owner_publish_override,true);
+    assert.equal((await live()).crop_review_status,'pending');
+    assert.equal((await live()).crop_reviewed_at,null);
+    assert.equal((await pending()).review_status,'pending');
+    assert.equal((await publishOwner('crops/third.png',third.revision)).rows[0].published,false);
+    assert.equal((await db.query('select owner_publish_override from public.live_questions')).rows[0].owner_publish_override,true);
+    await db.exec("update public.questions set statement='changed' where id='q1'");
+    assert.equal((await live()).owner_publish_override,false);
+    assert.equal((await live()).is_published,false);
+    await stage({...replacement,statement:'new missing crop'});
+    await assert.rejects(publishOwner('missing.png',(await pending()).revision), /Stale review/);
+    await crop((await pending()).revision,'crops/rejected.png');
+    await review('crops/rejected.png',false,false);
+    assert.equal((await publishOwner('crops/rejected.png',(await pending()).revision)).rows[0].published,false);
+    await db.exec('set role authenticated');
+    await assert.rejects(publishOwner('crops/rejected.png',third.revision),/permission denied/);
+    await db.exec('reset role');
     await db.exec('set role anon');
     await assert.rejects(db.query('select * from public.question_updates'),/permission denied/);
     await assert.rejects(stage(draft),/permission denied/);
+    await assert.rejects(publishOwner('crops/third.png',third.revision),/permission denied/);
     await assert.rejects(review('crops/third.png',true,true),/permission denied/);
     await db.exec('reset role');
   } finally { await db.close(); }

@@ -13,7 +13,7 @@
    Set `NEXT_PUBLIC_SUPABASE_ANON_KEY` for the post-publication visitor-access check.
    Never put the service key in frontend code or commit `.env.local`.
 
-No frontend redeployment is needed for staged publication: approved replacements
+No frontend redeployment is needed for normal reviewed publication: approved replacements
 are promoted into the existing questions table and existing image fields.
 The new scripts refuse to write if the staging migration is missing.
 
@@ -112,3 +112,30 @@ Supabase project and inspect its read policies rather than re-extracting exams.
 application migrations and triggers. It verifies staging, preservation of published
 content and user progress, stale review rejection, repeat publication, transaction
 rollback, and anonymous permission denial. It does not contact production or Gemini.
+
+## Publish without individual review (explicit owner option)
+
+Apply `supabase/migrations/202610060007_owner_unreviewed.sql` once, after 0006.
+Deploy this updated frontend to Vercel after applying the migration. Older frontends
+only display approved crops and will not display these unreviewed images.
+
+In Windows Command Prompt, run:
+
+```bat
+cd /d "C:\Users\mahde\Downloads\gbank-image-first"
+npm run course:update -- 80181 --publish-unreviewed --dry-run
+npm run course:update -- 80181 --publish-unreviewed
+```
+
+No Gemini calls, extraction, or decision file is needed. Only pending candidates
+with uploaded images and source coordinates are published. Missing crops, rejected
+candidates, retired questions and already-live identical images are skipped.
+Existing reviewed candidates still use the normal `--publish` workflow.
+This does not repair a bad crop: students see a visible Hebrew notice that the image
+was published without manual review. The database retains `pending` review status
+and empty reviewer metadata; owner publication is a separate explicit flag.
+Changing the source image or text invalidates that flag. Only the service role can
+call the publication function; no browser publish control is added.
+
+Publication commits per question. If interrupted, rerun the same command; completed
+publications are skipped. You can later review and approve the same image normally.

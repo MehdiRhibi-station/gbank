@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { readFile, readdir, stat, mkdir, open, unlink } from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { parseReviewJson, reviewRows } from '../lib/crop-safety.mjs';
+import { publishUnreviewed } from '../lib/publish-unreviewed.mjs';
 import { allRows, requireStaging } from '../lib/pipeline-db.mjs';
 import { parseUpdateArgs, coursePlan, saveState, runStages } from '../lib/course-workflow.mjs';
 
@@ -40,13 +41,15 @@ async function status(client, course) {
   const exams = await allRows(() => client.from('exams').select('id').eq('course_number', course).order('id'));
   const questions = [];
   for (let i = 0; i < exams.length; i += 100) questions.push(...await allRows(() =>
-    client.from('questions').select('id,is_published,retired_at').in('exam_id', exams.slice(i, i + 100).map(e => e.id)).order('id')));
+    client.from('questions').select('id,is_published,retired_at,image_path,crop_review_status').in('exam_id', exams.slice(i, i + 100).map(e => e.id)).order('id')));
   const updates = [];
   for (let i = 0; i < questions.length; i += 200) updates.push(...await allRows(() =>
     client.from('question_updates').select('question_id,image_path,review_status,draft')
       .in('question_id', questions.slice(i, i + 200).map(q => q.id)).order('question_id')));
   console.log(`Course ${course}: ${exams.length} exams | ${questions.filter(q => q.is_published && !q.retired_at).length} live questions`);
-  console.log(`Candidates: ${updates.length} | awaiting review: ${updates.filter(q => q.image_path && q.review_status === 'pending').length} | rejected: ${updates.filter(q => q.review_status === 'rejected').length} | missing boxes: ${updates.filter(q => !q.draft.image_page || !q.draft.image_bbox).length}`);
+  const livePaths = new Map(questions.filter(q => q.is_published && !q.retired_at).map(q => [q.id, q.image_path]));
+  console.log(`Published without review: ${questions.filter(q => q.is_published && !q.retired_at && q.crop_review_status === 'pending').length}`);
+  console.log(`Candidates: ${updates.length} | awaiting review: ${updates.filter(q => q.image_path && q.review_status === 'pending' && livePaths.get(q.question_id) !== q.image_path).length} | rejected: ${updates.filter(q => q.review_status === 'rejected').length} | missing boxes: ${updates.filter(q => !q.draft.image_page || !q.draft.image_bbox).length}`);
 }
 async function decisionFile(course, explicit) {
   if (explicit) return path.resolve(explicit);
@@ -93,9 +96,11 @@ async function main() {
   npm run course:update -- 80181 [--from 2016 --to 2026 --course-name "Name"]
   npm run course:update -- 80181 --status
   npm run course:update -- 80181 --publish [--file PATH] [--dry-run]
+  npm run course:update -- 80181 --publish-unreviewed [--dry-run]
 Options: --refresh (check for new exams; keep extraction caches), --yes (consent to API use),
   --delay-ms 6000, --no-open, --dry-run (print plan only; no API calls or writes).
-Interrupted runs resume automatically. Publication always requires human decisions.
+Interrupted runs resume automatically. Normal publication requires review decisions. --publish-unreviewed explicitly skips review.
+Apply 202610060007_owner_unreviewed.sql before using --publish-unreviewed.
 Run from the project folder. Apply 202610060006_staged_updates.sql first.`);
     return;
   }
@@ -115,7 +120,7 @@ Run from the project folder. Apply 202610060006_staged_updates.sql first.`);
     throw new Error('Invalid year range.');
   if (!Number.isFinite(config.delay) || config.delay < 0) throw new Error('Invalid --delay-ms.');
   const steps = coursePlan(root, args.course, config);
-  if (args['dry-run'] && !args.publish) {
+  if (args['dry-run'] && !args.publish && !args['publish-unreviewed']) {
     for (const step of steps) console.log(`${step.name}: node ${step.script} ${step.args.map(s => JSON.stringify(s)).join(' ')}`);
     console.log('Plan only. No files, database rows, or API calls changed.');
     return;
@@ -127,6 +132,11 @@ Run from the project folder. Apply 202610060006_staged_updates.sql first.`);
   if (args.status) return;
   const release = await lock(path.join(dir, 'update.lock'));
   try {
+    if (args['publish-unreviewed']) {
+      await publishUnreviewed(client, args.course, { dryRun: Boolean(args['dry-run']) });
+      await status(client, args.course);
+      return;
+    }
     if (args.publish) {
       const file = await decisionFile(args.course, args.file);
       const document = await json(file);
