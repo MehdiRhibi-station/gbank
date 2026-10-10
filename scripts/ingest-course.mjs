@@ -17,6 +17,7 @@ import {
   pagePrompt,
 } from "../lib/extraction-prompt.mjs";
 import { groupCourseDraft } from "../lib/question-groups.mjs";
+import { retryDownload } from "../lib/retry.mjs";
 
 const HUJI_SEARCH_URL = "https://www4.huji.ac.il/htbin/exams/exams.cgi";
 const DEFAULT_FROM_YEAR = 2016;
@@ -349,18 +350,21 @@ async function downloadExam(exam, directory) {
   }
 
   const partial = destination + ".part";
-  const response = await fetchWithTimeout(
-    exam.url,
-    { headers: { "User-Agent": "GBank owner import tool" } },
-    180000,
-  );
-  if (!response.ok) {
-    throw new Error("Could not download " + exam.filename + " (HTTP " + response.status + ")");
-  }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length < 5 || bytes.subarray(0, 5).toString("ascii") !== "%PDF-") {
-    throw new Error("HUJI did not return a PDF for " + exam.filename);
-  }
+  const bytes = await retryDownload(async () => {
+    const response = await fetchWithTimeout(
+      exam.url,
+      { headers: { "User-Agent": "GBank owner import tool" } },
+      180000,
+    );
+    if (!response.ok) {
+      throw Object.assign(new Error("Could not download " + exam.filename + " (HTTP " + response.status + ")"), { status: response.status });
+    }
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length < 5 || bytes.subarray(0, 5).toString("ascii") !== "%PDF-") {
+      throw new Error("HUJI did not return a PDF for " + exam.filename);
+    }
+    return bytes;
+  });
   await writeFile(partial, bytes);
   await rename(partial, destination);
   console.log("  downloaded " + exam.filename);

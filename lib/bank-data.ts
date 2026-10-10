@@ -101,7 +101,7 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
     supabase
       .from("live_questions")
       .select(
-        "id,exam_id,ordinal,question_number,subpart,points,nature,difficulty,topics,title,context,statement,uncertain,extraction_status,image_path,image_page,image_bbox,image_width,image_height,crop_review_status",
+        "id,exam_id,ordinal,question_number,subpart,points,nature,difficulty,topics,title,context,statement,uncertain,extraction_status,image_path,image_page,image_bbox,image_width,image_height,crop_review_status,owner_publish_override",
       )
       .eq("is_published", true)
       .order("ordinal"),
@@ -165,6 +165,7 @@ export async function loadRemoteBankData(): Promise<BankData | null> {
       imageWidth: row.image_width,
       imageHeight: row.image_height,
       cropReviewStatus: row.crop_review_status,
+      ownerPublishOverride: row.owner_publish_override === true,
     }));
 
   // Once Supabase is available it is the only public source of truth. Mixing

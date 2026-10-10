@@ -1,5 +1,29 @@
 # תודל (Toodle)
 
+## Smooth course updates (owner only)
+
+Use the unified updater instead of copying paths between six scripts. Apply
+`supabase/migrations/202610060006_staged_updates.sql` once after the existing
+migrations, then run `npm install` and:
+
+```powershell
+npm run course:update -- 80181 --from 2016 --course-name "מתמטיקה דיסקרטית"
+```
+
+The command resumes downloads/extraction, groups whole questions, repairs boxes,
+stages drafts, and opens the crop review. Review and download your decisions, then:
+
+```powershell
+npm run course:update -- 80181 --publish
+```
+
+Existing approved questions stay live while replacements are prepared. Rejected
+replacements do not hide them. Partial-year imports no longer retire other years.
+Review choices persist in the same browser for the same images.
+
+See [the update guide](docs/course-update.md) for migration setup, resume/status,
+quota errors, explicit review files, and the older-script compatibility change.
+
 בנק שאלות למבחני האוניברסיטה העברית: חיפוש לפי נושא ואופי השאלה, רמזים מהקהילה,
 שמירת התקדמות וצפייה בסריקות המקור. הפרויקט מגיע עם 117 שאלות מ-18 מבחנים בשני
 קורסים: אינפי 1 ותורת ההסתברות 1.
@@ -278,3 +302,11 @@ legacy/                 The original one-file prototype and extraction tools
 
 השאלות נכתבו בידי סגלי הקורסים והזכויות עליהן שמורות לאוניברסיטה העברית. לפני
 פרסום רחב של סריקות מלאות, ודאו שקיבלתם הרשאה מתאימה. גיבנק מציג רמזים ולא פתרונות מלאים.
+
+### Owner publication without individual review
+
+After applying `supabase/migrations/202610060007_owner_unreviewed.sql` and deploying
+this frontend, run `npm run course:update -- 80181 --publish-unreviewed`.
+This explicitly publishes available pending crops without Gemini calls or approval
+files. Missing or rejected crops are skipped. Images carry an unreviewed notice;
+no human approval is fabricated. See [the updater guide](docs/course-update.md).

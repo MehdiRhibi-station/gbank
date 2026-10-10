@@ -54,8 +54,8 @@ export function QuestionCard({
   const [posting, setPosting] = useState(false);
   const scanFrame = useRef<HTMLDivElement>(null);
   const transcription = [question.context, question.statement].filter(Boolean).join("\n");
-  const hasApprovedImage = Boolean(
-    question.imagePath && question.cropReviewStatus === "approved",
+  const hasPublishedImage = Boolean(
+    question.imagePath && (question.cropReviewStatus === "approved" || (question.cropReviewStatus === "pending" && question.ownerPublishOverride === true)),
   );
   const showsFullPage = Boolean(question.imagePath?.startsWith("pages/"));
 
@@ -110,7 +110,7 @@ export function QuestionCard({
         </div>
 
         <h2>{question.title}</h2>
-        {hasApprovedImage ? (
+        {hasPublishedImage ? (
           imageUrl === undefined ? (
             <div className="question-scan-loading" role="status">
               טוען את סריקת המקור…
@@ -145,7 +145,9 @@ export function QuestionCard({
                 </div>
               </div>
               <figcaption>
-                {showsFullPage
+                {question.cropReviewStatus !== "approved"
+                  ? "פורסם ללא בדיקה ידנית. ייתכנו טעויות בחיתוך — בדקו מול המבחן המקורי."
+                  : showsFullPage
                   ? "דף המקור המלא מוצג. המסגרת הכתומה היא סימון עזר אוטומטי."
                   : "חיתוך מתוך הסריקה המקורית, שנבדק ואושר לשאלה הזאת."}
               </figcaption>

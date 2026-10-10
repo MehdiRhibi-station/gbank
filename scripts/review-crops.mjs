@@ -6,6 +6,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { parseReviewJson, reviewRows } from "../lib/crop-safety.mjs";
+import { requireStaging } from "../lib/pipeline-db.mjs";
 
 function usage() {
   console.log(`
@@ -22,7 +23,7 @@ Options:
   --help        Show this help
 
 The script refuses stale decisions: every storagePath in the review file must
-still be the exact image_path attached to that question.
+still be the exact staged image for that question. Rejection preserves live content.
 `);
 }
 
@@ -111,6 +112,7 @@ async function main() {
   const supabase = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  await requireStaging(supabase);
 
   const examResult = await supabase
     .from("exams")
@@ -131,11 +133,17 @@ async function main() {
     currentRows.push(...(result.data ?? []));
   }
   const currentById = new Map(currentRows.map((row) => [row.id, row]));
+  const stagedById = new Map();
+  for (const batch of chunks(decided.map(row => row.id), 200)) {
+    const result = await supabase.from("question_updates").select("question_id,image_path")
+      .in("question_id", batch);
+    if (result.error) throw new Error(result.error.message);
+    for (const row of result.data ?? []) stagedById.set(row.question_id, row);
+  }
   for (const decision of decided) {
     const current = currentById.get(decision.id);
     if (!current) throw new Error(`Question is missing or belongs to another course: ${decision.id}`);
-    if (current.retired_at) throw new Error(`Question is retired: ${decision.id}`);
-    if (current.image_path !== decision.storagePath) {
+    if (stagedById.get(decision.id)?.image_path !== decision.storagePath) {
       throw new Error(
         `Stale review for ${decision.id}. The database image changed; review the new image instead.`,
       );
@@ -150,33 +158,22 @@ async function main() {
   let applied = 0;
   let published = 0;
   for (const decision of decided) {
-    const review = await supabase.rpc("mark_crop_reviewed", {
+    const review = await supabase.rpc("review_question_update", {
       p_question_id: decision.id,
       p_expected_image_path: decision.storagePath,
       p_approved: decision.decision === "approved",
+      p_publish: Boolean(args.publish),
     });
     if (review.error) throw new Error(`Could not review ${decision.id}: ${review.error.message}`);
     applied += 1;
 
-    if (args.publish && decision.decision === "approved") {
-      const publish = await supabase
-        .from("questions")
-        .update({ is_published: true })
-        .eq("id", decision.id)
-        .eq("image_path", decision.storagePath)
-        .select("id");
-      if (publish.error) throw new Error(`Could not publish ${decision.id}: ${publish.error.message}`);
-      if (publish.data?.length !== 1) {
-        throw new Error(`Publication matched ${publish.data?.length ?? 0} rows for ${decision.id}`);
-      }
-      published += 1;
-    }
+    if (review.data === true) published += 1;
   }
 
   console.log(`Applied ${applied} review decision(s).`);
   console.log(
     args.publish
-      ? `Published ${published} approved question(s); rejected and pending questions remain hidden.`
+      ? `Published ${published} approved update(s); rejected/pending replacements did not change live questions.`
       : "Nothing was published. Run again with --publish after checking the summary.",
   );
 }

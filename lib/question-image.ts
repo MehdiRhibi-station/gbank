@@ -51,7 +51,7 @@ export async function signedImagesForQuestionIds(questionIds: string[]) {
       .select("id,image_path,crop_review_status")
       .in("id", ids)
       .eq("is_published", true)
-      .eq("crop_review_status", "approved")
+      .or("crop_review_status.eq.approved,and(crop_review_status.eq.pending,owner_publish_override.eq.true)")
       .not("image_path", "is", null);
     if (result.error || !result.data) return {} as Record<string, string>;
 

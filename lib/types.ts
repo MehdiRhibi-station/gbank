@@ -57,6 +57,7 @@ export interface Question {
   imageWidth?: number | null;
   imageHeight?: number | null;
   cropReviewStatus?: CropReviewStatus;
+  ownerPublishOverride?: boolean;
 }
 
 export interface BankData {
@@ -125,5 +126,6 @@ export interface LegacySeed {
     imageWidth?: number;
     imageHeight?: number;
     cropReviewStatus?: CropReviewStatus;
+    ownerPublishOverride?: boolean;
   }>;
 }

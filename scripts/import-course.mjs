@@ -8,6 +8,7 @@ import path from "node:path";
 import process from "node:process";
 import { collapseDuplicateExamQuestions } from "../lib/import-questions.mjs";
 import { groupCourseDraft } from "../lib/question-groups.mjs";
+import { requireStaging } from "../lib/pipeline-db.mjs";
 
 function usage() {
   console.log(`
@@ -20,6 +21,7 @@ Options:
   --data PATH                  Course JSON in the GBank export format (required)
   --pdf-dir PATH               Folder containing the exam PDFs
   --dry-run                    Validate and show what would be imported
+  --retire-missing             Explicit full-course replacement: retire absent IDs
   --archive-after-upload PATH  Move uploaded PDFs to this folder after full success
   --delete-after-upload        Delete uploaded PDFs only after full success
   --help                       Show this help
@@ -33,7 +35,7 @@ function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (value === "--dry-run" || value === "--delete-after-upload" || value === "--help") {
+    if (["--dry-run", "--delete-after-upload", "--retire-missing", "--help"].includes(value)) {
       args[value.slice(2)] = true;
       continue;
     }
@@ -202,6 +204,8 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const courseNumber = String(data.course.number);
+  await requireStaging(supabase);
+  if (!data.questions.length) throw new Error("Refusing to import an empty question set.");
 
   await upsertOrThrow(
     supabase.from("courses").upsert(
@@ -221,7 +225,7 @@ async function main() {
 
   const existingExamResult = await supabase
     .from("exams")
-    .select("id,source_filename,source_hash")
+    .select("id,source_filename,source_hash,storage_path")
     .eq("course_number", courseNumber);
   if (existingExamResult.error) {
     throw new Error("Could not inspect existing exams: " + existingExamResult.error.message);
@@ -310,6 +314,12 @@ async function main() {
   for (const item of localFiles) {
     const targetExamId = sourceIdToExamId.get(item.sourceId);
     if (uploadedExamIds.has(targetExamId)) continue;
+    const existing = (existingExamResult.data ?? []).find(exam => exam.id === targetExamId);
+    if (existing?.storage_path && existing.source_hash === sourceHashes.get(item.sourceId)) {
+      uploadedExamIds.add(targetExamId);
+      console.log(`Kept uploaded PDF ${item.exam.file}`);
+      continue;
+    }
     const storagePath = `${courseNumber}/${item.exam.file}`;
     const bytes = await readFile(item.localPath);
     const upload = await supabase.storage.from("exam-files").upload(storagePath, bytes, {
@@ -357,57 +367,28 @@ async function main() {
       statement: item.question.st,
       uncertain: Boolean(item.question.unc),
       extractor: item.question.extractor ?? data.extractor ?? null,
-      retired_at: null,
+      image_page: item.question.imagePage ?? null,
+      image_bbox: item.question.imageBbox ?? null,
     },
   }));
-  const questionRows = questionImports.map((item) => item.row);
-  for (const batch of chunks(questionRows, 500)) {
-    await upsertOrThrow(
-      supabase.from("questions").upsert(batch, {
-        onConflict: "exam_id,question_number,subpart",
-      }),
-      "Question import failed",
-    );
+  const keptIds = [];
+  for (const { row } of questionImports) {
+    const result = await supabase.rpc("stage_question_update", { p_draft: row });
+    if (result.error) throw new Error(`Question staging failed for ${row.id}: ${result.error.message}`);
+    keptIds.push(result.data);
   }
-
-  // Verification status is intentionally never accepted from JSON. It can
-  // only be changed by mark_verified(). Image metadata is updated separately
-  // so an older text-only draft cannot erase a crop that is already in use.
-  for (const { question, row } of questionImports) {
-    if (!question.imagePage || !question.imageBbox) continue;
-    const update = {
-      image_page: question.imagePage,
-      image_bbox: question.imageBbox,
-    };
-    const result = await supabase
-      .from("questions")
-      .update(update)
-      .eq("exam_id", row.exam_id)
-      .eq("question_number", row.question_number)
-      .eq("subpart", row.subpart)
-      .select("id");
-    if (result.error) {
-      throw new Error(`Question image metadata failed for ${question.id}: ${result.error.message}`);
-    }
-    if (result.data?.length !== 1) {
-      throw new Error(
-        `Question image metadata matched ${result.data?.length ?? 0} rows for ${question.id}`,
-      );
-    }
+  console.log(`Staged ${keptIds.length} question(s). Existing published versions were preserved.`);
+  // Partial year ranges are additive by default. Retirement is a separate,
+  // explicit full-course operation and uses the canonical IDs returned by DB.
+  if (args["retire-missing"]) {
+    const result = await supabase.rpc("retire_missing_questions", {
+      p_course_number: courseNumber, p_kept_ids: keptIds,
+    });
+    if (result.error) throw new Error("Could not retire missing questions: " + result.error.message);
+    console.log(`Retired ${result.data ?? 0} missing question(s).`);
+  } else {
+    console.log("No questions retired (additive import).");
   }
-
-  // Retirement is deliberately last. A failed upsert leaves the old live set
-  // intact; a successful import hides missing questions without deleting their
-  // hints, votes or progress.
-  const keptIds = questionRows.map((question) => question.id);
-  const retireResult = await supabase.rpc("retire_missing_questions", {
-    p_course_number: courseNumber,
-    p_kept_ids: keptIds,
-  });
-  if (retireResult.error) {
-    throw new Error("Could not retire missing questions: " + retireResult.error.message);
-  }
-  console.log(`Retired ${retireResult.data ?? 0} missing question(s).`);
 
   if (archiveDirectory && uploadedFiles.length) {
     await mkdir(archiveDirectory, { recursive: true });

@@ -325,7 +325,7 @@ export function BankApp() {
       .filter(
         (question) =>
           question.imagePath &&
-          question.cropReviewStatus === "approved" &&
+          (question.cropReviewStatus === "approved" || (question.cropReviewStatus === "pending" && question.ownerPublishOverride === true)) &&
           !requestedQuestionImages.current.has(question.id),
       )
       .map((question) => question.id);
